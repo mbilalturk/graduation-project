@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-03-10 15:38:36.903773",
+  "tables": {
+    "istanbul_bus_positions": {
+      "total_records": "50",
+      "latest_record": "2026-03-10 12:38:36",
+      "today_records": "50"
+    },
+    "weather_data": {
+      "total_records": "2",
+      "latest_record": "2026-03-10 12:38:36",
+      "today_records": "2"
+    },
+    "traffic_data": {
+      "total_records": "5",
+      "latest_record": "2026-03-10 12:38:36",
+      "today_records": "5"
+    },
+    "event_data": {
+      "total_records": "2",
+      "latest_record": "2026-03-10 12:38:36",
+      "today_records": "2"
+    }
+  }
+}

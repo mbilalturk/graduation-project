@@ -1,0 +1,294 @@
+{
+	"info": {
+		"_postman_id": "34d498ba-83a0-4f05-8c81-63572c9a7597",
+		"name": "Izmir Web Services",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "10656808"
+	},
+	"item": [
+		{
+			"name": "announcements",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "resource_id",
+							"value": "aeafda53-3db8-46fa-abe3-47b773fc8b90",
+							"type": "text"
+						},
+						{
+							"key": "limit",
+							"value": "5",
+							"type": "text"
+						},
+						{
+							"key": "q",
+							"value": "jones",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "https://acikveri.bizizmir.com/en/api/3/action/datastore_search?resource_id=aeafda53-3db8-46fa-abe3-47b773fc8b90&limit=2",
+					"protocol": "https",
+					"host": [
+						"acikveri",
+						"bizizmir",
+						"com"
+					],
+					"path": [
+						"en",
+						"api",
+						"3",
+						"action",
+						"datastore_search"
+					],
+					"query": [
+						{
+							"key": "resource_id",
+							"value": "aeafda53-3db8-46fa-abe3-47b773fc8b90"
+						},
+						{
+							"key": "limit",
+							"value": "2"
+						},
+						{
+							"key": "q",
+							"value": "jones",
+							"disabled": true
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "lines",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "resource_id",
+							"value": "bd6c84f8-49ba-4cf4-81f8-81a0fbb5caa3",
+							"type": "text"
+						},
+						{
+							"key": "limit",
+							"value": "5",
+							"type": "text"
+						},
+						{
+							"key": "q",
+							"value": "jones",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "https://acikveri.bizizmir.com/en/api/3/action/datastore_search?resource_id=bd6c84f8-49ba-4cf4-81f8-81a0fbb5caa3&limit=2&filters={\"DURAK_ID\": 5}",
+					"protocol": "https",
+					"host": [
+						"acikveri",
+						"bizizmir",
+						"com"
+					],
+					"path": [
+						"en",
+						"api",
+						"3",
+						"action",
+						"datastore_search"
+					],
+					"query": [
+						{
+							"key": "resource_id",
+							"value": "bd6c84f8-49ba-4cf4-81f8-81a0fbb5caa3"
+						},
+						{
+							"key": "limit",
+							"value": "2"
+						},
+						{
+							"key": "q",
+							"value": null,
+							"disabled": true
+						},
+						{
+							"key": "filters",
+							"value": "{\"DURAK_ID\": 5}"
+						}
+					]
+				},
+				"description": "Generated from cURL: curl -G 'https://acikveri.bizizmir.com/en/api/3/action/datastore_search' \\\r\n  --data-urlencode 'resource_id=bd6c84f8-49ba-4cf4-81f8-81a0fbb5caa3' \\\r\n  --data-urlencode 'limit=5' \\\r\n  --data-urlencode 'q=jones' \\\r\n  -H 'Accept: application/json'\r\n"
+			},
+			"response": []
+		},
+		{
+			"name": "stops",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "resource_id",
+							"value": "0c791266-a2e4-4f14-82b8-9a9b102fbf94",
+							"type": "text"
+						},
+						{
+							"key": "limit",
+							"value": "5",
+							"type": "text"
+						},
+						{
+							"key": "q",
+							"value": "jones",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "https://acikveri.bizizmir.com/en/api/3/action/datastore_search?resource_id=0c791266-a2e4-4f14-82b8-9a9b102fbf94&limit=2",
+					"protocol": "https",
+					"host": [
+						"acikveri",
+						"bizizmir",
+						"com"
+					],
+					"path": [
+						"en",
+						"api",
+						"3",
+						"action",
+						"datastore_search"
+					],
+					"query": [
+						{
+							"key": "resource_id",
+							"value": "0c791266-a2e4-4f14-82b8-9a9b102fbf94"
+						},
+						{
+							"key": "limit",
+							"value": "2"
+						},
+						{
+							"key": "q",
+							"value": "jones",
+							"disabled": true
+						},
+						{
+							"key": "filters",
+							"value": "{\"DURAK_ID\": 5}",
+							"disabled": true
+						}
+					]
+				},
+				"description": "Generated from cURL: curl -G 'https://acikveri.bizizmir.com/en/api/3/action/datastore_search' \\\r\n  --data-urlencode 'resource_id=0c791266-a2e4-4f14-82b8-9a9b102fbf94' \\\r\n  --data-urlencode 'limit=5' \\\r\n  --data-urlencode 'q=jones' \\\r\n  -H 'Accept: application/json'\r\n"
+			},
+			"response": []
+		},
+		{
+			"name": "deperatureTimes",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "resource_id",
+							"value": "0c791266-a2e4-4f14-82b8-9a9b102fbf94",
+							"type": "text"
+						},
+						{
+							"key": "limit",
+							"value": "5",
+							"type": "text"
+						},
+						{
+							"key": "q",
+							"value": "jones",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "https://acikveri.bizizmir.com/en/api/3/action/datastore_search?resource_id=c6fa6046-f755-47d7-b69e-db6bb06a8b5a&limit=2&filters={\"HAT_NO\": 6}",
+					"protocol": "https",
+					"host": [
+						"acikveri",
+						"bizizmir",
+						"com"
+					],
+					"path": [
+						"en",
+						"api",
+						"3",
+						"action",
+						"datastore_search"
+					],
+					"query": [
+						{
+							"key": "resource_id",
+							"value": "c6fa6046-f755-47d7-b69e-db6bb06a8b5a"
+						},
+						{
+							"key": "limit",
+							"value": "2"
+						},
+						{
+							"key": "q",
+							"value": "jones",
+							"disabled": true
+						},
+						{
+							"key": "filters",
+							"value": "{\"HAT_NO\": 6}"
+						}
+					]
+				},
+				"description": "Generated from cURL: curl -G 'https://acikveri.bizizmir.com/en/api/3/action/datastore_search' \\\r\n  --data-urlencode 'resource_id=0c791266-a2e4-4f14-82b8-9a9b102fbf94' \\\r\n  --data-urlencode 'limit=5' \\\r\n  --data-urlencode 'q=jones' \\\r\n  -H 'Accept: application/json'\r\n"
+			},
+			"response": []
+		}
+	]
+}
