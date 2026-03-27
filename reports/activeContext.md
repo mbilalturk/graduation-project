@@ -1,0 +1,54 @@
+# Active Context
+
+**Son Guncelleme:** 2026-03-27
+
+---
+
+## Aktif Calisma Alanlari
+
+### 1. Veri Toplama (KRITIK - BEKLIYOR)
+- **Durum:** Collector kodu hazir ve test edildi, ancak surekli calistirilmiyor
+- **Sorun:** Henuz yeterli gercek zamanli veri toplanmadi. 20 dk'lik test verisi var (61 segment), hedef minimum 1 hafta (~3000 segment)
+- **Aksiyon:** `collector.py --interval 30` arka planda baslatilmali ve en az 1 hafta calistirilmali
+- **Etki:** Tum model sonuclari bu veriye bagimli. Veri toplamadan ilerlenemez.
+
+### 2. Pipeline Dogrulama ✅ TAMAMLANDI
+- Tum 5 notebook (feature_engineering → baseline → deep_learning → hybrid → evaluation) 20 dk test verisiyle basariyla calistirildi
+- Sonuc tablolari ve gorseller uretildi
+- Pipeline end-to-end calisiyor
+
+### 3. Proje Dosya Temizligi ✅ TAMAMLANDI (2026-03-27)
+- Duplike veri klasorleri temizlendi (`izmir_dataset/` silindi, `data/` kaldi)
+- Eski plan dosyalari temizlendi (sadece `EXECUTION_PLAN.md` + `ROUTE_502_PILOT_PLAN.md` kaldi)
+- Root Python dosyalari `scripts/` altina tasindi
+- Duplike roadmap ve makale txt versiyonu silindi
+
+---
+
+## Bloklayicilar
+
+| # | Bloklayici | Etki | Cozum |
+|---|-----------|------|-------|
+| 1 | **Yetersiz gercek zamanli veri** | Modeller anlamli sonuc veremiyor (61 segment ile LSTM kotu) | Collector'i 1+ hafta surekli calistir |
+| 2 | **OpenWeatherMap API key yok** | Hava durumu mock veri ile calisiyor, gercek etki olculemiyor | Ucretsiz API key al ve env var olarak ayarla |
+| 3 | **Demo sistemi entegre degil** | `web_dashboard.py` eski kod, hibrit modelle calismiyor | Asama 7'de guncellenecek (oncelik dusuk) |
+
+---
+
+## Yakin Vadeli Oncelikler (Sirali)
+
+1. **Collector'i baslatmak** — Minimum 1 hafta, ideal 2-4 hafta veri toplama
+2. **Veri kalite kontrolu** — 1. gun sonunda `trip_extractor.py --stats` ile dogrulama
+3. **Notebook'lari yeniden calistirmak** — Yeterli veri toplandiktan sonra tum pipeline
+4. **Sonuclari degerlendirmek** — MAE < 2.5 dk hedefine ulasildi mi?
+5. **Final rapor yazmak** — Asama 8
+6. **Demo sistemi** — Asama 7 (opsiyonel)
+
+---
+
+## Acik Sorular
+
+- Collector suresi: 1 hafta yeterli mi yoksa 2-4 hafta mi beklenecek?
+- Hava durumu: Gercek API key alinacak mi yoksa mock ile devam mi?
+- Demo zorunlu mu yoksa opsiyonel mi (juri beklentisi)?
+- Baska rotalar (599, 585, 268, 171) eklenecek mi yoksa sadece 502 mi kalacak?
