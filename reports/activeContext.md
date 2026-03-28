@@ -1,6 +1,6 @@
 # Active Context
 
-**Son Guncelleme:** 2026-03-27
+**Son Guncelleme:** 2026-03-28
 
 ---
 
@@ -12,12 +12,19 @@
 - **Aksiyon:** `collector.py --interval 30` arka planda baslatilmali ve en az 1 hafta calistirilmali
 - **Etki:** Tum model sonuclari bu veriye bagimli. Veri toplamadan ilerlenemez.
 
-### 2. Pipeline Dogrulama ✅ TAMAMLANDI
+### 2. TomTom Trafik Entegrasyonu ✅ TAMAMLANDI (2026-03-28)
+- TomTom Traffic Flow API entegrasyonu `collector.py`'ye eklendi
+- 31 segment orta noktasindan 20 dakikada bir trafik verisi toplanir
+- `traffic_readings` tablosu: current_speed, free_flow_speed, congestion_ratio, confidence
+- Gunluk ~2,232 istek (ucretsiz limit: 2,500/gun)
+- `TOMTOM_API_KEY` ortam degiskeni gerekli; key yoksa trafik verisi atlanir
+
+### 3. Pipeline Dogrulama ✅ TAMAMLANDI
 - Tum 5 notebook (feature_engineering → baseline → deep_learning → hybrid → evaluation) 20 dk test verisiyle basariyla calistirildi
 - Sonuc tablolari ve gorseller uretildi
 - Pipeline end-to-end calisiyor
 
-### 3. Proje Dosya Temizligi ✅ TAMAMLANDI (2026-03-27)
+### 4. Proje Dosya Temizligi ✅ TAMAMLANDI (2026-03-27)
 - Duplike veri klasorleri temizlendi (`izmir_dataset/` silindi, `data/` kaldi)
 - Eski plan dosyalari temizlendi (sadece `EXECUTION_PLAN.md` + `ROUTE_502_PILOT_PLAN.md` kaldi)
 - Root Python dosyalari `scripts/` altina tasindi
@@ -31,7 +38,8 @@
 |---|-----------|------|-------|
 | 1 | **Yetersiz gercek zamanli veri** | Modeller anlamli sonuc veremiyor (61 segment ile LSTM kotu) | Collector'i 1+ hafta surekli calistir |
 | 2 | **OpenWeatherMap API key yok** | Hava durumu mock veri ile calisiyor, gercek etki olculemiyor | Ucretsiz API key al ve env var olarak ayarla |
-| 3 | **Demo sistemi entegre degil** | `web_dashboard.py` eski kod, hibrit modelle calismiyor | Asama 7'de guncellenecek (oncelik dusuk) |
+| 3 | **TomTom API key yok** | Trafik verisi toplanamıyor | Ucretsiz TomTom developer hesabi ac ve key al |
+| 4 | **Demo sistemi entegre degil** | `web_dashboard.py` eski kod, hibrit modelle calismiyor | Asama 7'de guncellenecek (oncelik dusuk) |
 
 ---
 

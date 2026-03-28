@@ -2,7 +2,8 @@
 Route 502 Real-Time Data Collector
 
 Izmir ESHOT API'den Route 502 icin gercek zamanli otobus konum verisi toplar.
-Her saatte bir OpenWeatherMap API'den hava durumu da kaydedilir.
+Her saatte bir OpenWeatherMap API'den hava durumu kaydedilir.
+Her 20 dakikada bir TomTom API'den trafik yogunlugu kaydedilir.
 Veriler SQLite veritabanina kaydedilir.
 
 Kullanim:
@@ -15,6 +16,11 @@ Hava durumu icin cevresel degisken ayarla (opsiyonel):
     Windows : set OPENWEATHER_API_KEY=your_key_here
     Linux   : export OPENWEATHER_API_KEY=your_key_here
     API key yoksa mock veri kaydedilir (gercek proje icin anahtar alin).
+
+Trafik verisi icin TomTom API key ayarla (opsiyonel):
+    Windows : set TOMTOM_API_KEY=your_key_here
+    Linux   : export TOMTOM_API_KEY=your_key_here
+    API key yoksa trafik verisi toplanmaz.
 """
 
 import argparse
@@ -47,7 +53,12 @@ from config import (
 WEATHER_LAT = 38.4600
 WEATHER_LON = 27.1700
 WEATHER_INTERVAL_SECONDS = 3600   # Saatte bir hava durumu cek
-OPENWEATHER_KEY = os.getenv("OPENWEATHER_API_KEY", "")
+OPENWEATHER_KEY = os.getenv("OPENWEATHER_API_KEY", "450fa2a944e15a8d76c0cb4fdc603cf3")
+
+# --- Trafik sabitleri (TomTom) ---
+TOMTOM_KEY = os.getenv("TOMTOM_API_KEY", "hV4FnRgW5uH47HwdFJ5hV486MQjehRrD")
+TRAFFIC_INTERVAL_SECONDS = 1200   # 20 dakikada bir trafik verisi cek
+TOMTOM_FLOW_URL = "https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json"
 
 # --- Logging ---
 logging.basicConfig(
@@ -132,12 +143,37 @@ def init_db():
         )
     """)
 
+    # Trafik yogunlugu kayitlari (TomTom, 20 dakikada bir)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS traffic_readings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            source TEXT NOT NULL,
+            segment_id TEXT NOT NULL,
+            from_stop_id INTEGER NOT NULL,
+            to_stop_id INTEGER NOT NULL,
+            from_stop_seq INTEGER NOT NULL,
+            to_stop_seq INTEGER NOT NULL,
+            direction INTEGER NOT NULL,
+            query_lat REAL NOT NULL,
+            query_lon REAL NOT NULL,
+            current_speed REAL,
+            free_flow_speed REAL,
+            congestion_ratio REAL,
+            current_travel_time REAL,
+            free_flow_travel_time REAL,
+            confidence REAL
+        )
+    """)
+
     # Indeksler
     c.execute("CREATE INDEX IF NOT EXISTS idx_bp_poll ON bus_positions(poll_id)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_bp_bus ON bus_positions(otobus_id, timestamp)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_sa_stop ON stop_arrivals(durak_id, timestamp)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_te_bus ON trip_events(otobus_id, timestamp)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_wr_ts ON weather_readings(timestamp)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_tr_ts ON traffic_readings(timestamp)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_tr_seg ON traffic_readings(segment_id, timestamp)")
 
     conn.commit()
     conn.close()
@@ -208,6 +244,112 @@ def fetch_weather():
         "conditions": conditions,
         "weather_category": _categorize_weather(conditions),
     }
+
+
+# --- Traffic (TomTom) ---
+def _build_segment_midpoints():
+    """
+    Route 502 durak ciftleri arasindaki orta noktalari hesapla.
+    Sadece dir0 (gidis) kullanilir — ayni yol segmentleri dir1 ile ortuşur.
+    Gunluk istek limiti: 31 segment x 72 (20dk aralik) = 2232 < 2500 limit.
+    """
+    segments = []
+    for i in range(len(STOPS_DIR0) - 1):
+        s1 = STOPS_DIR0[i]
+        s2 = STOPS_DIR0[i + 1]
+        mid_lat = (s1["lat"] + s2["lat"]) / 2
+        mid_lon = (s1["lon"] + s2["lon"]) / 2
+        segments.append({
+            "segment_id": f"{s1['stop_id']}_{s2['stop_id']}",
+            "from_stop_id": s1["stop_id"],
+            "to_stop_id": s2["stop_id"],
+            "from_stop_seq": s1["seq"],
+            "to_stop_seq": s2["seq"],
+            "direction": 0,
+            "lat": round(mid_lat, 5),
+            "lon": round(mid_lon, 5),
+        })
+    return segments
+
+
+ROUTE_SEGMENTS = _build_segment_midpoints()
+
+
+def fetch_traffic_segment(lat, lon):
+    """
+    TomTom Flow Segment Data API'den tek bir nokta icin trafik bilgisi cek.
+    Doner: dict veya None (hata durumunda).
+    """
+    params = urlencode({
+        "point": f"{lat},{lon}",
+        "unit": "KMPH",
+        "openLr": "false",
+        "key": TOMTOM_KEY,
+    })
+    url = f"{TOMTOM_FLOW_URL}?{params}"
+    data = fetch_json(url)
+    if data is None:
+        return None
+
+    fsd = data.get("flowSegmentData")
+    if fsd is None:
+        return None
+
+    current_speed = fsd.get("currentSpeed", 0)
+    free_flow_speed = fsd.get("freeFlowSpeed", 1)
+    congestion_ratio = round(current_speed / free_flow_speed, 3) if free_flow_speed > 0 else 0.0
+
+    return {
+        "current_speed": current_speed,
+        "free_flow_speed": free_flow_speed,
+        "congestion_ratio": congestion_ratio,
+        "current_travel_time": fsd.get("currentTravelTime"),
+        "free_flow_travel_time": fsd.get("freeFlowTravelTime"),
+        "confidence": fsd.get("confidence", -1.0),
+    }
+
+
+def fetch_all_traffic():
+    """
+    Tum Route 502 segmentleri icin trafik verisi topla.
+    TomTom API key yoksa bos liste doner.
+    """
+    if not TOMTOM_KEY:
+        return []
+
+    results = []
+    for seg in ROUTE_SEGMENTS:
+        traffic = fetch_traffic_segment(seg["lat"], seg["lon"])
+        if traffic:
+            results.append({**seg, **traffic, "source": "tomtom"})
+        else:
+            log.warning(f"Trafik verisi alinamadi: segment {seg['segment_id']}")
+    return results
+
+
+def save_traffic(timestamp, traffic_list):
+    """Trafik kayitlarini veritabanina ekle."""
+    if not traffic_list:
+        return
+    conn = sqlite3.connect(DB_PATH)
+    for t in traffic_list:
+        conn.execute("""
+            INSERT INTO traffic_readings
+            (timestamp, source, segment_id, from_stop_id, to_stop_id,
+             from_stop_seq, to_stop_seq, direction, query_lat, query_lon,
+             current_speed, free_flow_speed, congestion_ratio,
+             current_travel_time, free_flow_travel_time, confidence)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            timestamp, t["source"], t["segment_id"],
+            t["from_stop_id"], t["to_stop_id"],
+            t["from_stop_seq"], t["to_stop_seq"],
+            t["direction"], t["lat"], t["lon"],
+            t["current_speed"], t["free_flow_speed"], t["congestion_ratio"],
+            t["current_travel_time"], t["free_flow_travel_time"], t["confidence"],
+        ))
+    conn.commit()
+    conn.close()
 
 
 def save_weather(timestamp, weather):
@@ -458,6 +600,8 @@ def poll_once():
 
 # Son hava durumu cekme zamani (baslangicta None -> ilk pollda hemen cek)
 _last_weather_fetch: datetime = None
+# Son trafik verisi cekme zamani
+_last_traffic_fetch: datetime = None
 
 
 def maybe_fetch_weather(now: datetime):
@@ -478,6 +622,32 @@ def maybe_fetch_weather(now: datetime):
             f"nem={weather['humidity']}%"
         )
         _last_weather_fetch = now
+
+
+def maybe_fetch_traffic(now: datetime):
+    """
+    TRAFFIC_INTERVAL_SECONDS sureden fazla gecmisse trafik verisi cek ve kaydet.
+    TomTom API key yoksa atlar.
+    """
+    global _last_traffic_fetch
+    if not TOMTOM_KEY:
+        return
+    if _last_traffic_fetch is None or (now - _last_traffic_fetch).total_seconds() >= TRAFFIC_INTERVAL_SECONDS:
+        timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
+        traffic_list = fetch_all_traffic()
+        save_traffic(timestamp, traffic_list)
+        if traffic_list:
+            avg_congestion = sum(t["congestion_ratio"] for t in traffic_list) / len(traffic_list)
+            min_congestion = min(t["congestion_ratio"] for t in traffic_list)
+            log.info(
+                f"Trafik [TomTom]: {len(traffic_list)}/{len(ROUTE_SEGMENTS)} segment, "
+                f"ort. akicilik={avg_congestion:.2f}, "
+                f"en yogun={min_congestion:.2f} "
+                f"(1.0=serbest, 0.0=durma)"
+            )
+        else:
+            log.warning("Trafik verisi alinamadi.")
+        _last_traffic_fetch = now
 
 
 def run_test():
@@ -510,9 +680,29 @@ def run_test():
     log.info(f"  Durum    : {weather['conditions']}")
     log.info(f"  Kategori : {weather['weather_category']}")
 
+    log.info("4. Trafik verisi test ediliyor...")
+    if TOMTOM_KEY:
+        # Tek bir segment ile test
+        test_seg = ROUTE_SEGMENTS[len(ROUTE_SEGMENTS) // 2]  # Ortadaki segment
+        traffic = fetch_traffic_segment(test_seg["lat"], test_seg["lon"])
+        if traffic:
+            log.info(f"  Segment  : {test_seg['segment_id']}")
+            log.info(f"  Konum    : ({test_seg['lat']}, {test_seg['lon']})")
+            log.info(f"  Hiz      : {traffic['current_speed']} km/h (serbest: {traffic['free_flow_speed']} km/h)")
+            log.info(f"  Akicilik : {traffic['congestion_ratio']} (1.0=serbest, 0.0=durma)")
+            log.info(f"  Sure     : {traffic['current_travel_time']}s (serbest: {traffic['free_flow_travel_time']}s)")
+            log.info(f"  Guven    : {traffic['confidence']}")
+        else:
+            log.warning("  TomTom API'den veri alinamadi!")
+        traffic_label = f"trafik: {traffic['congestion_ratio']}" if traffic else "trafik: HATA"
+    else:
+        log.info("  TOMTOM_API_KEY ayarlanmamis — trafik verisi toplanmiyor.")
+        log.info("  Ayarlamak icin: export TOMTOM_API_KEY=your_key_here")
+        traffic_label = "trafik: YOK (API key eksik)"
+
     log.info(
         f"\nTest tamamlandi. {len(positions)} otobus, "
-        f"{len(arrivals)} yaklasan kaydi, hava: {weather['weather_category']}."
+        f"{len(arrivals)} yaklasan kaydi, hava: {weather['weather_category']}, {traffic_label}."
     )
 
 
@@ -546,6 +736,9 @@ def run_collector(interval, duration):
 
             # Hava durumu: saatte bir
             maybe_fetch_weather(now)
+
+            # Trafik verisi: 20 dakikada bir (TomTom)
+            maybe_fetch_traffic(now)
 
             # Otobus verisi: her pollda
             n_pos, n_arr, n_evt = poll_once()

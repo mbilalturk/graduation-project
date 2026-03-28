@@ -1,6 +1,6 @@
 # Progress
 
-**Son Guncelleme:** 2026-03-27
+**Son Guncelleme:** 2026-03-28
 
 ---
 
@@ -9,8 +9,9 @@
 ### Asama 0 — Veri Toplama Altyapisi ✅
 - [x] Izmir Teknoloji API kesfedildi ve test edildi (anonim erisim, JSON)
 - [x] `data_collector/config.py` — Route 502 durak listesi (32 gidis + 28 donus), API endpointleri
-- [x] `data_collector/collector.py` — GPS polling (30sn), hava durumu (saatlik), SQLite kayit, trip event detection
+- [x] `data_collector/collector.py` — GPS polling (30sn), hava durumu (saatlik), trafik (20dk), SQLite kayit, trip event detection
 - [x] OpenWeatherMap entegrasyonu (gercek + mock fallback)
+- [x] TomTom Traffic Flow API entegrasyonu (31 segment, congestion_ratio, 20dk aralik)
 - [x] Graceful shutdown (SIGINT/SIGTERM), loglama, test modu
 
 ### Asama 1 — Ham Veri Cikarma ✅
@@ -76,6 +77,7 @@
 - [ ] Minimum 1 hafta (~3000 segment) veri toplanmali
 - [ ] Ilk gun: `trip_extractor.py --stats` ile kalite kontrolu
 - [ ] OpenWeatherMap API key alinmali (opsiyonel ama onerilen)
+- [ ] TomTom API key alinmali (`export TOMTOM_API_KEY=...`)
 
 ### Asama 3-6 Tekrar — Yeni Veri ile ⬜
 - [ ] Yeterli veri toplandiktan sonra tum notebook'lar sirayla tekrar calistirilacak
