@@ -1,0 +1,6 @@
+Yon,N,Enhanced XGB MAE,Random Forest MAE,XGBoost MAE,Yon_Label,Kosul Tipi,Zaman Dilimi,Hava Durumu,Durak Bolge
+0.0,6,0.4963,0.636,0.687,Halkapinar->Cengizhan,Yon,,,
+1.0,7,0.2605,0.5128,0.471,Cengizhan->Halkapinar,Yon,,,
+,13,0.3694,0.5697,0.5707,,Zaman Dilimi,off_peak,,
+,13,0.3694,0.5697,0.5707,,Hava Durumu,,clear,
+,12,0.3997,0.5484,0.5975,,Durak Pozisyonu,,,Baslangic (0-33%)

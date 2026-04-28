@@ -1,0 +1,4 @@
+Metrik,Makale (Istanbul LSTM),Bizim (Enhanced XGB),Fark
+MAE (dk),2.97,0.3694,-2.6006 (-87.6%)
+MAPE (%),14.79,21.38,+6.5900 (+44.6%)
+R2,0.9272,0.4885,-0.4387 (-47.3%)
