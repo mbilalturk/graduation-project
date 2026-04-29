@@ -1,6 +1,12 @@
 Yon,N,Enhanced XGB MAE,Random Forest MAE,XGBoost MAE,Yon_Label,Kosul Tipi,Zaman Dilimi,Hava Durumu,Durak Bolge
-0.0,6,0.4963,0.636,0.687,Halkapinar->Cengizhan,Yon,,,
-1.0,7,0.2605,0.5128,0.471,Cengizhan->Halkapinar,Yon,,,
-,13,0.3694,0.5697,0.5707,,Zaman Dilimi,off_peak,,
-,13,0.3694,0.5697,0.5707,,Hava Durumu,,clear,
-,12,0.3997,0.5484,0.5975,,Durak Pozisyonu,,,Baslangic (0-33%)
+0.0,14978,0.0192,0.4715,0.4863,Halkapinar->Cengizhan,Yon,,,
+1.0,12679,0.0218,0.519,0.5185,Cengizhan->Halkapinar,Yon,,,
+,4426,0.0213,0.4289,0.4422,,Zaman Dilimi,evening_peak,,
+,7285,0.0211,0.5242,0.5276,,Zaman Dilimi,morning_peak,,
+,2262,0.0279,0.4601,0.4655,,Zaman Dilimi,night,,
+,13684,0.0184,0.5032,0.5119,,Zaman Dilimi,off_peak,,
+,14100,0.02,0.4955,0.5076,,Hava Durumu,,clear,
+,13557,0.0207,0.491,0.4943,,Hava Durumu,,cloudy,
+,3698,0.0561,0.8344,0.9043,,Durak Pozisyonu,,,Baslangic (0-33%)
+,13821,0.0124,0.4095,0.4076,,Durak Pozisyonu,,,Bitis (66-100%)
+,10138,0.0182,0.483,0.4814,,Durak Pozisyonu,,,Orta (33-66%)

@@ -1,6 +1,6 @@
 Karsilastirma,MAE Fark (dk),t-stat,p (t-test),p (Wilcoxon),Anlamli (p<0.05)
-Enhanced XGB vs Naive (GTFS),0.2491,3.3323,0.006,0.0081,Evet
-Enhanced XGB vs Historical Avg,0.2294,1.9766,0.0715,0.0681,Hayir
-Enhanced XGB vs Linear Reg,0.2873,2.3341,0.0378,0.0327,Evet
-Enhanced XGB vs Random Forest,0.2003,2.0445,0.0635,0.1465,Hayir
-Enhanced XGB vs XGBoost,0.2013,3.3754,0.0055,0.0034,Evet
+Enhanced XGB vs Naive (GTFS),0.5921,117.6169,0.0,0.0,Evet
+Enhanced XGB vs Historical Avg,0.5369,121.1995,0.0,0.0,Evet
+Enhanced XGB vs Linear Reg,0.5765,117.7544,0.0,0.0,Evet
+Enhanced XGB vs Random Forest,0.4729,112.1129,0.0,0.0,Evet
+Enhanced XGB vs XGBoost,0.4807,112.3442,0.0,0.0,Evet
