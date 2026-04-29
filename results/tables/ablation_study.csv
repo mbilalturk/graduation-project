@@ -1,6 +1,6 @@
 config,MAE (dk),features
-deviation_history YOK,0.0197,16
-Tam Model (tum ozellikler),0.0204,17
-Hava durumu YOK,0.0241,12
-scheduled + deviation YOK,0.0273,15
-scheduled_travel_minutes YOK,0.0288,16
+Hava durumu YOK,0.4818,11
+Tam Model (tum ozellikler),0.5064,16
+scheduled + deviation YOK,0.5186,14
+deviation_history YOK,0.5189,15
+scheduled_travel_minutes YOK,0.5206,15

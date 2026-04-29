@@ -1,10 +1,10 @@
 model,MAE (dk),RMSE (dk),MAPE (%),R2
-Enhanced XGBoost,0.0204,0.1043,1.33,0.9905
-Hybrid Stacking,0.0204,0.1044,1.33,0.9905
 LSTM,0.4138,0.6914,42.11,0.0484
 GRU,0.414,0.6887,41.89,0.0558
 Random Forest,0.4695,0.8731,50.22,0.3325
 XGBoost,0.4784,0.8819,52.15,0.3191
+Hybrid Stacking,0.5003,0.9295,54.53,0.2435
+Enhanced XGBoost,0.5064,0.9282,56.14,0.2456
 Historical Average,0.5662,0.9922,62.5,0.1379
 Linear Regression,0.5933,1.0597,64.33,0.0167
 Naive (GTFS Scheduled),0.6125,1.0935,64.99,-0.047

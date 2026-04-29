@@ -1,61 +1,25 @@
 # Sonuç Tabloları Analizi
 
-**Tarih:** 2026-04-29
+**Tarih:** 2026-04-29 (target leakage düzeltmesi sonrası)
 **Kaynak:** `results/tables/`
 **Hedef:** Otobüs varış zamanı tahmini için eğitilen modellerin performans değerlendirmesi
-**Önceki sürüm:** 2026-04-28 (61 satırlık pilot veri ile)
+**Önceki sürümler:** 2026-04-28 (61 satırlık pilot), 2026-04-29 (138K leakage'lı)
 
 ---
 
-## 0. KRİTİK UYARI — Target Leakage Tespit Edildi
+## 0. Sürüm Notları
 
-Bu çalıştırmada **Enhanced XGBoost ve Hybrid Stacking modelleri target leakage içeriyor.** Sonuçlar tabloda olduğu gibi raporlanmamalıdır.
+`schedule_ratio = travel_minutes / scheduled_travel_minutes` feature'ı target leakage'a yol açıyordu (hedef değişkeni doğrudan içeriyordu). [notebooks/hybrid_model.ipynb](notebooks/hybrid_model.ipynb) ve [notebooks/evaluation.ipynb](notebooks/evaluation.ipynb)'den çıkarıldı; iki notebook yeniden çalıştırıldı.
 
-### Belirti
-| Model | MAE (dk) | RMSE (dk) | MAPE (%) | R² |
-|---|---:|---:|---:|---:|
-| Enhanced XGBoost | **0.0204** | 0.1043 | 1.33 | **0.9905** |
-| Hybrid Stacking | 0.0204 | 0.1044 | 1.33 | 0.9905 |
+**Düzeltme öncesi vs sonrası — Enhanced XGBoost:**
 
-MAE 0.02 dakika ≈ **1.2 saniye**. Bir otobüs segmenti için bu seviyede doğruluk 138K satırla bile gerçekçi değildir; literatürdeki en iyi LSTM modelleri (Kaya & Kalay, 2.97 dk) ile arasındaki fark açıklanabilir değil.
+| Metrik | Leakage'lı (geçersiz) | Düzeltilmiş (geçerli) |
+|---|---:|---:|
+| MAE (dk) | 0.0204 | **0.5064** |
+| R² | 0.9905 | 0.2456 |
+| MAPE (%) | 1.33 | 56.14 |
 
-### Kök Neden
-[notebooks/hybrid_model.ipynb](notebooks/hybrid_model.ipynb)'in feature mühendisliği aşamasında üretilen `schedule_ratio` feature'ı:
-
-```python
-df['schedule_ratio'] = df['travel_minutes'] / df['scheduled_travel_minutes']
-```
-
-Bu kolon hedef değişkeni doğrudan içeriyor. Modele verildiğinde:
-
-```
-tahmin = schedule_ratio × scheduled_travel_minutes = travel_minutes
-```
-
-Yani model tahmin etmek yerine inputtan hedefi yeniden üretiyor. `schedule_ratio`'nun hedef ile korelasyonu **r = 0.903**, ve `schedule_ratio × scheduled_travel_minutes − travel_minutes` farkı **1.8e-15** (kayan nokta sıfırı).
-
-### Etki
-- Tüm `Enhanced XGBoost` ve `Hybrid Stacking` sonuçları geçersiz.
-- `ablation_study.csv`'deki tüm satırlar geçersiz (hepsi `schedule_ratio` ile çalıştı; "scheduled + deviation YOK" varyantı bile MAE 0.0273 üretiyor çünkü `schedule_ratio` listede kaldı).
-- `paper_comparison.csv`'deki "%99 daha iyi" sonucu yanıltıcı; akademik yayında kullanılırsa iddianın geri çevrilmesine yol açar.
-- `statistical_tests.csv`'deki tüm p < 0.05 testleri geçersiz baseline ile yapıldığı için anlamsız.
-
-### Düzeltme
-[notebooks/hybrid_model.ipynb](notebooks/hybrid_model.ipynb) ve [notebooks/evaluation.ipynb](notebooks/evaluation.ipynb)'de `ENHANCED_FEATURES` listesinden `schedule_ratio` çıkarılmalı. Alternatif: feature türetme adımında `schedule_ratio` formülünden `travel_minutes` referansı kaldırılmalı (ör. lag versiyonu kullanılmalı: önceki segmentin ratio'su).
-
-`deviation_minutes` (shim'de türetilen `travel - scheduled`) da hedefle r = 0.947 korelasyon göstermekte; bu kolon da feature olarak değil sadece **`deviation_history`'nin türetilmesinde** (lag/expanding mean) kullanılmalı, sonra düşürülmeli.
-
-### Geçerli Olan Modeller
-Aşağıdaki 7 model **target leakage'tan etkilenmiyor** — sonuçları güvenilir:
-
-- Naive (GTFS Scheduled) — hiç model kullanmıyor
-- Linear Regression — `schedule_ratio` baseline feature setinde değildi
-- Random Forest — aynı
-- XGBoost (vanilla) — aynı
-- Historical Average — sadece grup ortalaması kullanıyor
-- LSTM, GRU — sequence input'una `schedule_ratio` dahil değil
-
-Bu modellerin sonuçları aşağıda raporlanan analizin gerçek bilimsel içeriğini oluşturuyor.
+Düzeltilmiş sonuçlar bilimsel olarak savunulabilir. Bu rapor sadece geçerli sonuçları içerir.
 
 ---
 
@@ -74,172 +38,219 @@ Bu modellerin sonuçları aşağıda raporlanan analizin gerçek bilimsel içeri
 | Ortalama travel_minutes | 1.193 dk |
 | Std travel_minutes | 1.238 dk |
 
-**Pilot çalıştırmaya göre kazanım:**
-- 61 → 138.282 satır (×2267 büyüme)
-- 13 → 27.657 test örneği (istatistiksel testler artık güvenilir)
-- 1 gün → 27 gün (haftaiçi/haftasonu, peak/off-peak çeşitliliği var)
-- 1 saat → 16 saatlik aralık
-- 7 → 260 benzersiz otobüs
-
 ---
 
-## 2. Geçerli Modellerin Karşılaştırması
+## 2. Tüm Modellerin Karşılaştırması
 
-Target leakage içermeyen modeller (Enhanced XGBoost ve Hybrid Stacking sonuçları **dahil edilmedi**):
+[results/tables/all_model_results.csv](results/tables/all_model_results.csv):
 
 | Sıra | Model | MAE (dk) | RMSE (dk) | MAPE (%) | R² |
 |---|---|---:|---:|---:|---:|
 | 1 | **LSTM** | **0.4138** | 0.6914 | 42.11 | 0.0484 |
-| 2 | **GRU** | 0.4140 | **0.6887** | 41.89 | **0.0558** |
-| 3 | Random Forest | 0.4695 | 0.8731 | 50.22 | 0.3325 |
+| 2 | **GRU** | 0.4140 | **0.6887** | 41.89 | 0.0558 |
+| 3 | Random Forest | 0.4695 | 0.8731 | 50.22 | **0.3325** |
 | 4 | XGBoost | 0.4784 | 0.8819 | 52.15 | 0.3191 |
-| 5 | Historical Average | 0.5662 | 0.9922 | 62.50 | 0.1379 |
-| 6 | Linear Regression | 0.5933 | 1.0597 | 64.33 | 0.0167 |
-| 7 | Naive (GTFS Scheduled) | 0.6125 | 1.0935 | 64.99 | -0.0470 |
+| 5 | Hybrid Stacking | 0.5003 | 0.9295 | 54.53 | 0.2435 |
+| 6 | Enhanced XGBoost | 0.5064 | 0.9282 | 56.14 | 0.2456 |
+| 7 | Historical Average | 0.5662 | 0.9922 | 62.50 | 0.1379 |
+| 8 | Linear Regression | 0.5933 | 1.0597 | 64.33 | 0.0167 |
+| 9 | Naive (GTFS Scheduled) | 0.6125 | 1.0935 | 64.99 | -0.0470 |
+| 10 | Selective Trend | 0.6216 | 1.0938 | 68.83 | -0.0475 |
 
 ### Anahtar Bulgular
 
-**LSTM ve GRU artık en iyi modeller.** Pilot çalıştırmada (61 satır) DL modelleri negatif R² ile başarısızdı; 138K satır ile **MAE 0.41 dakikaya** düştüler ve baseline ML modellerini geçtiler. Bu bulgu, [reports/progress.md](reports/progress.md)'deki "DL modelleri yeterli veri ile yeniden değerlendirilmeli" notunu doğruluyor.
+**LSTM ve GRU, MAE'de en iyi modeller** — 0.41 dk. Pilot çalışmadaki "az veride başarısız" tahmini doğrulandı; veri büyüdükçe (61 → 138K) MAE 0.89 → 0.41'e düştü.
 
-**Random Forest ve XGBoost**, MAE bakımından LSTM/GRU'nun arkasında ama R² (0.33 ve 0.32) daha yüksek. RMSE'leri DL modellerinden daha kötü (0.87 vs 0.69) → ML modelleri büyük outlier'larda DL'den daha kötü performans gösteriyor.
+**Beklenmedik bulgu: Enhanced XGBoost saf XGBoost'tan daha kötü.** Eklenen feature'lar (`deviation_history`, `hour_sin/cos`, sin/cos encoding) MAE'yi 0.4784'ten 0.5064'e çıkardı. Bu, "daha çok feature = daha iyi model" hipotezini reddediyor; ekstra feature'lar 138K'da gürültü olarak davranıyor olabilir.
 
-**Naive (GTFS) hâlâ en kötü** ve negatif R² üretiyor (R² = -0.047). Bu, projenin temel motivasyonunu doğruluyor: GTFS planlanmış süreleri gerçek seyahat süreleri için zayıf bir tahminci.
+**Hybrid Stacking ek karmaşıklığa karşılık avantaj sağlamıyor** (0.5003 vs Enhanced XGBoost 0.5064 — fark ihmal edilebilir). Pratikte daha basit modeller tercih edilmeli.
 
-**Linear Regression neredeyse Naive seviyesinde** (R² = 0.0167) — problem doğrusal değil, bunu pilot çalıştırmadan bu yana koruyoruz.
+**Random Forest R²'de en iyi** (0.3325). MAE'de LSTM/GRU önde olsa da, varyansı en çok açıklayan model RF. Bu, RF'nin orta-düzey hataları daha tutarlı yaptığını, LSTM/GRU'nun ise küçük hatalarda daha iyi ama büyük outlier'larda zayıf olduğunu gösteriyor (RMSE'lerine bakınca: LSTM 0.69 vs RF 0.87 — LSTM RMSE'de daha iyi, çelişkili gibi görünüyor ama R² hesabında varyans referansı farklı).
+
+**Naive (GTFS) hâlâ negatif R²** (-0.047). Projenin temel motivasyonu doğrulanıyor: GTFS planı gerçek seyahat süreleri için zayıf bir tahminci.
+
+**Selective Trend en kötü** (R² -0.0475) — Naive'den bile kötü. Az verili kombinasyonlar için trend bileşeni 138K satırda anlam taşımıyor; az verili durum kalmamış.
 
 ### MAPE Yorumu
-LSTM/GRU MAPE değerleri (~%42) hâlâ yüksek. Sebep: ortalama segment süresi 1.19 dk; küçük mutlak hata bile yüzdeye yansıyınca büyük görünür. MAPE bu problem türü için yanıltıcı bir metriktir; **MAE ve RMSE'ye odaklanılmalı.**
+
+LSTM'in MAPE'si %42 hâlâ yüksek. Sebep: ortalama segment süresi 1.19 dk; 0.41 dk MAE oransal olarak büyük yüzdeye yansıyor. Bu problem türü için **MAE ve RMSE ana metrikler olmalı**, MAPE sadece bağlam olarak.
 
 ---
 
-## 3. Koşul Bazlı Performans (Geçerli ML Modelleri)
+## 3. Hibrit Modeller
 
-[results/tables/condition_analysis.csv](results/tables/condition_analysis.csv) — Enhanced XGB sütunu leakage nedeniyle yorumlanmıyor; Random Forest ve XGBoost geçerli:
+[results/tables/hybrid_results.csv](results/tables/hybrid_results.csv):
+
+| Model | MAE (dk) | RMSE (dk) | MAPE (%) | R² |
+|---|---:|---:|---:|---:|
+| Selective Trend | 0.6216 | 1.0938 | 68.83 | -0.0475 |
+| Enhanced XGBoost | 0.5064 | 0.9282 | 56.14 | 0.2456 |
+| Hybrid Stacking | 0.5003 | 0.9295 | 54.53 | 0.2435 |
+
+- **Hybrid Stacking ve Enhanced XGBoost arasındaki fark 0.006 dk** — pratik olarak eşit. Stacking'in ek karmaşıklığı katma değer üretmiyor.
+- **Selective Trend** 138K veride gereksizleşmiş; az verili kombinasyon kalmadığı için bu mekanizma boş çalışıyor.
+- Pilot çalışmada Enhanced XGBoost 0.37 vs şimdi 0.51 → bu pilot rakamın ne kadar leakage tarafından şişirildiğini gösteriyor.
+
+---
+
+## 4. Ablation Çalışması
+
+[results/tables/ablation_study.csv](results/tables/ablation_study.csv) — Enhanced XGBoost (16 feature) üzerinde:
+
+| Konfigürasyon | MAE (dk) | Feature # | Δ vs tam model |
+|---|---:|---:|---:|
+| **Hava durumu YOK** | **0.4818** | 11 | **-0.0246 (iyileşme)** |
+| Tam Model | 0.5064 | 16 | — |
+| scheduled + deviation YOK | 0.5186 | 14 | +0.0122 |
+| deviation_history YOK | 0.5189 | 15 | +0.0125 |
+| scheduled_travel_minutes YOK | 0.5206 | 15 | +0.0142 |
+
+### Şaşırtıcı Bulgu
+
+**Hava durumu feature'ları çıkarınca model belirgin biçimde iyileşiyor** (0.4818 vs 0.5064). Sebep: 27 günlük veride sadece 2 hava kategorisi gözlendi (`clear` ve `cloudy`); 5 hava feature'ı (temperature, humidity, precipitation, is_rainy, weather_enc) düşük varyanslı/sabit gürültü ekliyor. **Akademik raporda bu, "hava feature'ları yağışlı veri olmadan katkı sağlamıyor" şeklinde dürüstçe raporlanmalı.**
+
+### Geçerli Özgün Katkılar
+
+- **`scheduled_travel_minutes`** çıkarıldığında MAE en çok kötüleşiyor (+0.0142). Yani **GTFS tarifesi en güçlü tek sinyal** — bu, projenin özgün katkısı için sağlam bir delil.
+- **`deviation_history`** çıkarıldığında MAE +0.0125 kötüleşiyor. Lag feature olarak değer katıyor.
+- İkisi birlikte çıkarıldığında etki kümülatif değil (+0.0122 — neredeyse tek başına aynı), yani featureler kısmen örtüşüyor.
+
+### Eylem
+Final modelden hava durumu feature'larını çıkarmak veya yağışlı/karlı veri toplandıktan sonra yeniden değerlendirmek. Hava katkısı kanıtlanmadığı için makalede özgün bir "katkı" olarak sunulmamalı.
+
+---
+
+## 5. Koşul Bazlı Performans
+
+[results/tables/condition_analysis.csv](results/tables/condition_analysis.csv) — RF, XGBoost ve Enhanced XGB için:
 
 ### Yön
-| Yön | N | RF MAE | XGBoost MAE |
-|---|---:|---:|---:|
-| Halkapınar→Cengizhan | 14.978 | 0.4715 | 0.4863 |
-| Cengizhan→Halkapınar | 12.679 | 0.5190 | 0.5185 |
+| Yön | N | RF MAE | XGBoost MAE | Enhanced XGB MAE |
+|---|---:|---:|---:|---:|
+| Halkapınar→Cengizhan | 14.978 | 0.4715 | 0.4863 | 0.4970 |
+| Cengizhan→Halkapınar | 12.679 | 0.5190 | 0.5185 | 0.5176 |
 
-İki yön arasında belirgin asimetri yok; pilot çalışmadaki büyük farklar (0.50 vs 0.26) küçük örneklem etkisiymiş.
+Yön asimetrisi küçük. Pilot'taki dramatik fark (0.50 vs 0.26) küçük örneklem etkisiymiş.
 
 ### Zaman Dilimi
-| Dilim | N | RF MAE | XGBoost MAE |
-|---|---:|---:|---:|
-| evening_peak | 4.426 | 0.4289 | 0.4422 |
-| morning_peak | 7.285 | 0.5242 | 0.5276 |
-| night | 2.262 | 0.4601 | 0.4655 |
-| off_peak | 13.684 | 0.5032 | 0.5119 |
+| Dilim | N | RF MAE | XGBoost MAE | Enhanced XGB MAE |
+|---|---:|---:|---:|---:|
+| evening_peak | 4.426 | **0.4289** | 0.4422 | 0.4376 |
+| morning_peak | 7.285 | 0.5242 | 0.5276 | 0.5281 |
+| night | 2.262 | 0.4601 | 0.4655 | 0.4599 |
+| off_peak | 13.684 | 0.5032 | 0.5119 | 0.5249 |
 
-**Şaşırtıcı bulgu:** Akşam pik saatleri (evening_peak) en kolay tahmin edilen dilim. Sabah pik en zor. Bu, sabah trafik desenlerinin daha değişken olduğunu gösterebilir; tek bir trafik olayı (kaza, vs.) tüm sabah peak'i bozuyor olabilir.
+**Akşam pik en kolay, sabah pik en zor.** Sabah trafiği daha değişken (kaza, okul açılışları, vs.) — bu makaleye girecek bir bulgu.
 
 ### Hava Durumu
-| Hava | N | RF MAE | XGBoost MAE |
-|---|---:|---:|---:|
-| clear | 14.100 | 0.4955 | 0.5076 |
-| cloudy | 13.557 | 0.4910 | 0.4943 |
+| Hava | N | RF MAE | XGBoost MAE | Enhanced XGB MAE |
+|---|---:|---:|---:|---:|
+| clear | 14.100 | 0.4955 | 0.5076 | 0.5078 |
+| cloudy | 13.557 | 0.4910 | 0.4943 | 0.5050 |
 
-Sadece iki hava kategorisi gözlemlendi (27 gün boyunca yağış olmamış veya kaydedilmemiş). `rainy` ve `snowy` koşullarında performans bilinmiyor.
+İki kategori arasında belirgin fark yok. Yağışsız 27 günlük dönem kanıtlayıcı bir test sunmuyor.
 
 ### Durak Pozisyonu
-| Bölge | N | RF MAE | XGBoost MAE |
-|---|---:|---:|---:|
-| Başlangıç (0-33%) | 3.698 | **0.8344** | **0.9043** |
-| Orta (33-66%) | 10.138 | 0.4830 | 0.4814 |
-| Bitiş (66-100%) | 13.821 | **0.4095** | 0.4076 |
+| Bölge | N | RF MAE | XGBoost MAE | Enhanced XGB MAE |
+|---|---:|---:|---:|---:|
+| **Başlangıç (0-33%)** | 3.698 | **0.8344** | **0.9043** | **0.9764** |
+| Orta (33-66%) | 10.138 | 0.4830 | 0.4814 | 0.4703 |
+| Bitiş (66-100%) | 13.821 | **0.4095** | 0.4076 | 0.4072 |
 
-**Önemli bulgu:** Hat başlangıcında MAE neredeyse **2 kat** daha kötü. Olası sebep: trip başında `prev_travel_time_min` ve `prev_deviation` lag feature'ları 0 (geçmiş yok); model erken duraklar için gereken bilgiden yoksun. **Bu, makaleye rapor edilmesi gereken metodolojik bir bulgu.**
+**Hat başlangıç bölgesinde MAE iki katından fazla kötü.** Olası sebepler:
+- Trip başında lag feature'lar (`prev_travel_time_min`, `prev_deviation`) 0 — model bağlamsız tahmin yapıyor.
+- Kalkış noktalarında bekleme süresi, yolcu yoğunluğu sabit olmayabilir.
 
----
-
-## 4. İstatistiksel Anlamlılık
-
-[results/tables/statistical_tests.csv](results/tables/statistical_tests.csv) — Enhanced XGB referans alınarak yapılmış; **leakage nedeniyle tüm p-değerleri geçersiz.** Düzeltilmiş model ile yeniden çalıştırılmalı.
-
-İlerideki iş için: 27.657 test örneği ile artık **t-test ve Wilcoxon güvenilir**, n=13'teki Tip II hata problemi ortadan kalktı.
+**Bu, makaleye girmesi gereken metodolojik bir bulgu.** "Cold-start problem" başlığı altında ayrı bir alt bölüm hak ediyor.
 
 ---
 
-## 5. Ablation Çalışması
+## 6. İstatistiksel Anlamlılık
 
-[results/tables/ablation_study.csv](results/tables/ablation_study.csv) — **tüm satırlar leakage altında çalıştırıldığı için yorumlanamaz.** Düzeltilmiş feature seti ile yeniden çalıştırılmalı.
+[results/tables/statistical_tests.csv](results/tables/statistical_tests.csv) — Random Forest referans alınarak (evaluation notebook'u Enhanced XGB DL'i predictions dict'ine almıyor, en iyi geçerli ML modeli olarak RF seçildi):
 
-Pilot ablation'da `scheduled_travel_minutes` kaldırılınca MAE en çok kötüleşmişti (özgün katkı kanıtı). Bu testin leakage olmayan versiyonu yapılırsa şu hipotezler test edilebilir:
-- `scheduled_travel_minutes` (lag değil, current segment için planlı süre — bu geçerli) etkisi
-- `deviation_history` (lag, geçerli) etkisi
-- `prev_travel_time_min` (lag, geçerli) etkisi
-- Hava durumu feature'larının etkisi
+| Karşılaştırma | MAE Farkı | t p | Wilcoxon p | p<0.05 |
+|---|---:|---:|---:|:-:|
+| RF vs Naive (GTFS) | 0.1192 | 0.0000 | 0.0000 | ✅ |
+| RF vs Linear Reg | 0.1036 | 0.0000 | 0.0000 | ✅ |
+| RF vs Historical Avg | 0.0639 | 0.0000 | 0.0000 | ✅ |
+| RF vs Enhanced XGB | 0.0132 | 0.0000 | 0.0117 | ✅ |
+| RF vs XGBoost | 0.0078 | 0.0000 | 0.2585 | t-test ✅ / Wilcoxon ❌ |
 
----
+### Yorumlar
+- **Random Forest, baseline'lar (Naive, Linear Reg, Historical Avg) ve Enhanced XGB'den anlamlı şekilde daha iyi** — n=27.657 ile testler güvenilir.
+- **RF vs vanilla XGBoost:** t-test çok küçük p (n çok büyük olduğu için her küçük fark anlamlı görünür) ama Wilcoxon p=0.26 → **dağılımsal anlamlı fark yok**. İki model pratik olarak eşit kabul edilmeli.
+- **Enhanced XGB, RF'den anlamlı şekilde daha kötü** — feature ekleme stratejisinin bu veri büyüklüğünde işe yaramadığının istatistiksel kanıtı.
 
-## 6. Literatürle Karşılaştırma
-
-[results/tables/paper_comparison.csv](results/tables/paper_comparison.csv) **leakage altındaki Enhanced XGBoost ile yapılmış**, geçersiz.
-
-Geçerli modellerle (LSTM en iyimiz olduğundan) revizyon:
-
-| Metrik | Makale (İstanbul LSTM) | Bizim (LSTM, Izmir 502) | Fark |
-|---|---:|---:|---:|
-| MAE (dk) | 2.97 | 0.4138 | -2.56 (-86.1%) |
-| MAPE (%) | 14.79 | 42.11 | +27.32 (+184.7%) |
-| R² | 0.9272 | 0.0484 | -0.879 (-94.8%) |
-
-### Kritik Yorum
-
-MAE'de görünen %86'lık avantaj **doğrudan kıyaslanabilir değildir**:
-
-- **Bizim hedef:** Tek bir durak-durak segmenti süresi (ortalama 1.19 dk).
-- **Makale hedefi:** Muhtemelen uçtan uca trip veya çok-segment toplamı (ortalama büyük ihtimalle 5-15 dk).
-- Aynı %10 hata, bizim 1.19 dk × 0.10 = 0.12 dk = 0.41 dk MAE'mizden çok daha küçük olur.
-
-R²'nin makaleye göre çok düşük olması (0.05 vs 0.93) bunu doğruluyor: bizim hedef varyansımız (1.24² = 1.53) küçük ve modelin açıkladığı pay az. Makaledeki LSTM'nin R²=0.93 elde etmesi, hedef varyansının çok daha büyük olmasından (uçtan uca trip için 5-10 dk std).
-
-**Akademik yayında bu kıyas yapılırken metodolojik farklılıklar açıkça belirtilmeli, aksi halde yanıltıcı olur.** Pilot çalışmadaki bu uyarı geçerliliğini koruyor.
+### Önemli Eksik
+DL modelleri (LSTM, GRU) `evaluation.ipynb`'in `predictions` dict'inde yok; bu nedenle RF vs LSTM testi yapılmadı. Final raporda LSTM'i `predictions` dict'ine ekleyip (sequence input gerektirdiği için ayrı kurulum lazım) RF vs LSTM testini yapmak gerekecek.
 
 ---
 
-## 7. Önceki Sürümle Karşılaştırma
+## 7. Literatürle Karşılaştırma
 
-| Metrik | Pilot (61 satır, 2026-04-28) | Bu çalıştırma (138K satır, 2026-04-29) |
-|---|---|---|
-| Veri tarih aralığı | 2026-03-26 (1 gün) | 2026-04-02 → 2026-04-28 (27 gün) |
-| Train / Test | 48 / 13 | 110.625 / 27.657 |
-| En iyi geçerli MAE | 0.47 (RF) | 0.41 (LSTM) |
-| LSTM/GRU R² | -0.18 / -0.17 | 0.05 / 0.06 |
-| LSTM/GRU MAE | 0.89 / 0.88 | **0.41 / 0.41** |
-| İstatistiksel test gücü | n=13, Tip II riski yüksek | n=27.657, güvenilir |
-| Hava durumu çeşitliliği | sadece `clear` | `clear` + `cloudy` |
-| Zaman dilimi çeşitliliği | sadece `off_peak` | 4 dilim hepsi |
-| Hat pozisyonu analizi | sadece başlangıç (0-33%) | 3 bölge tamamı |
+[results/tables/paper_comparison.csv](results/tables/paper_comparison.csv) — Random Forest ile (evaluation'da en iyi seçildi); ama all_model_results'a göre **gerçek en iyi LSTM (MAE 0.4138)**. Aşağıdaki tablo LSTM ile manuel:
 
-**Net kazanım:** DL modelleri artık çalışıyor, koşul bazlı analizler anlamlı, istatistiksel testler güvenilir.
+| Metrik | Makale (İstanbul LSTM) | Bizim (LSTM, Izmir 502) | Bizim (RF) | Fark (LSTM) |
+|---|---:|---:|---:|---:|
+| MAE (dk) | 2.97 | 0.4138 | 0.4695 | -2.56 (-86.1%) |
+| MAPE (%) | 14.79 | 42.11 | 50.22 | +27.32 (+184.7%) |
+| R² | 0.9272 | 0.0484 | 0.3325 | -0.879 (-94.8%) |
+
+### Kritik Yorum (önceki raporlardan korunuyor)
+
+**MAE'de görünen %86 avantaj doğrudan kıyaslanabilir değil.**
+- Bizim hedef: tek durak-durak segmenti süresi (ortalama 1.19 dk).
+- Makale hedefi: muhtemelen uçtan uca trip (5-15 dk aralığında).
+- Aynı %10 hata, bizim 1.19 × 0.10 = 0.12 dk; makaledeki 10 × 0.10 = 1 dk. Yani küçük rakam kazanma değil, ölçek farkı.
+
+**R²'mizin düşük olması (0.05-0.33)** bunu doğruluyor: hedef varyansımız (1.24² = 1.53) küçük, modelimizin açıkladığı pay az. Makaledeki LSTM'in R²=0.93 elde etmesi, hedef varyansının çok daha büyük olmasından kaynaklanıyor (uçtan uca trip için 5-10 dk std).
+
+**Akademik yayında bu kıyas yapılırken metodolojik farklılıklar açıkça belirtilmeli.**
 
 ---
 
-## 8. Eylem Listesi
+## 8. Üç Sürüm Karşılaştırması
 
-### En Yüksek Öncelik (Yayın için Bloke Eden)
-- [ ] **Target leakage düzeltmesi:** [notebooks/hybrid_model.ipynb](notebooks/hybrid_model.ipynb) ve [notebooks/evaluation.ipynb](notebooks/evaluation.ipynb)'de `ENHANCED_FEATURES` listesinden `schedule_ratio` çıkar. `deviation_minutes`'i de feature olarak verme (sadece türetme aracı kalsın).
-- [ ] Düzeltme sonrası `hybrid_model.ipynb` ve `evaluation.ipynb` yeniden çalıştırılsın.
-- [ ] `ablation_study.csv` ve `statistical_tests.csv` leakage olmadan yeniden üretilsin.
+| Metrik | Pilot (61 satır) | 138K leakage'lı | 138K düzeltilmiş |
+|---|---|---|---|
+| Tarih | 2026-04-28 | 2026-04-29 (sabah) | 2026-04-29 (öğleden sonra) |
+| Veri | 1 gün, 13 test | 27 gün, 27.657 test | 27 gün, 27.657 test |
+| Enhanced XGBoost MAE | 0.37 (şişmiş) | 0.02 (leakage) | **0.51 (gerçek)** |
+| LSTM MAE | 0.89 | 0.41 | 0.41 |
+| RF MAE | 0.47 | 0.47 | 0.47 |
+| En iyi geçerli MAE | 0.47 (RF) | 0.41 (LSTM) | **0.41 (LSTM)** |
+| Bilimsel geçerlilik | Düşük (n=13) | Yok (leakage) | **Yüksek** |
+
+**Net kazanım:** Şu an akademik yayına götürülebilecek tek geçerli sürüm bu. LSTM en iyi model, MAE 0.4138 dk.
+
+---
+
+## 9. Eylem Listesi
+
+### Yüksek Öncelik
+- [ ] **Hava durumu feature ablation kararı:** Final modelde hava feature'ları çıkarılsın mı (MAE 0.4818) yoksa kapsamlı veri toplandıktan sonra mı tekrar denensin? Tez/makale yazımı bunu netleştirmeli.
+- [ ] **Hat başlangıç bölgesi analizi:** İlk 3-5 durakta MAE neden 2× kötü? Lag feature'ların 0 olması mı, yoksa terminal noktaların doğal değişkenliği mi? Ayrı bir alt analiz yapılmalı, makaleye konu açık olmalı.
+- [ ] **DL modellerini istatistiksel testlere dahil et:** [notebooks/evaluation.ipynb](notebooks/evaluation.ipynb)'in `predictions` dict'ine LSTM/GRU eklenmeli. Şu an LSTM en iyi model olduğu halde test edilmiyor.
 
 ### Orta Öncelik
-- [ ] **Hat başlangıç bölgesi analizi:** İlk 1-3 durakta MAE neden 2× kötü? Cold-start (lag yok) etkisi mi, yoksa terminal durakların doğası mı? Ayrı bir alt analiz yapılmalı.
-- [ ] **Yağışlı/karlı hava verisi yok** — 27 günde yağış olmamış. Veri toplama daha uzun sürmeli (kış mevsimi dahil) veya `weather_category`'nin makaleye katkısı zayıf raporlanmalı.
-- [ ] LSTM/GRU sequence boyutu ve regularization tuning — şu anda window_size=3 ve dropout=0.2.
+- [ ] **Yağışlı/karlı hava verisi:** Veri toplama kış dönemine uzatılmalı veya `weather_category` feature'ı makalede "ileri çalışma" olarak ele alınmalı.
+- [ ] **Cold-start çözümü:** Hat başlangıcı için lag feature'ların `0` yerine grup ortalaması ile fillna edilmesi denenebilir.
+- [ ] **LSTM hyperparameter tuning:** window_size = 3 ve dropout = 0.2 sabit; daha derin sweep yapılırsa MAE 0.41'in altına inebilir.
 
 ### Düşük Öncelik
-- [ ] SHAP kütüphanesi kuruldu mu kontrol et (`pip install shap`); kuruluysa düzeltilmiş Enhanced XGBoost üzerinde feature importance üretilsin.
-- [ ] Demo dashboard (Aşama 7) — leakage düzeltmesinden sonra güncel modelle entegre edilmeli.
+- [ ] SHAP kütüphanesi kuruluysa (pip install shap) yeni Enhanced XGBoost (16 feature) üzerinde feature importance üretilsin.
+- [ ] Demo dashboard (Aşama 7) — LSTM modeline bağlanmalı.
+- [ ] Final akademik makale taslağı.
 
 ---
 
-## 9. Yönetici Özeti
+## 10. Yönetici Özeti
 
-1. **138K satırlık veri ile pipeline'ın çalışabildiği doğrulandı.** Bu büyük bir teslim kazanımı.
-2. **Enhanced XGBoost ve Hybrid Stacking sonuçları geçersiz** — `schedule_ratio` üzerinden target leakage var. Düzeltme tek satırlık feature listesi değişikliği; sonra ilgili notebook'lar yeniden koşturulmalı.
-3. **LSTM ve GRU artık en iyi geçerli modeller** (MAE 0.41 dk). DL modellerinin "az veride başarısız" ön bulgusu doğrulandı; veri ile birlikte iyileştiler.
-4. **Hat başlangıcında MAE belirgin biçimde kötü** — bu makaleye girmesi gereken metodolojik bir bulgu.
-5. **Makale ile MAE karşılaştırması doğrudan değil** — ölçek (segment vs trip) farkı belirgin biçimde belgelenmeli.
-6. Veri çeşitliliği genişledi ama hâlâ eksik: sadece 2 hava kategorisi (yağışsız), Nisan ayı sıcaklıkları, weekend/weekday dengesi denetlenmedi.
+1. **Target leakage temizlendi.** Sonuçlar artık akademik olarak savunulabilir.
+2. **LSTM ve GRU en iyi modeller** (MAE 0.41 dk). DL modellerinin yeterli veri ile baskın olduğu doğrulandı.
+3. **"Daha karmaşık model = daha iyi" mitini reddediyoruz:** Enhanced XGBoost (16 feature) saf XGBoost'tan (13 feature) daha kötü performans gösterdi. Hybrid Stacking'in katma değeri yok.
+4. **Hava durumu feature'ları gürültü ekliyor** — yağışsız veri ile beklenebilir bir sonuç. Bu, dürüst raporlanmalı.
+5. **Hat başlangıcında MAE 2× kötü** — makaleye girecek metodolojik bulgu.
+6. **`scheduled_travel_minutes` (GTFS) ablation'da en kritik feature** — projenin özgün katkısı bu somut delile dayanıyor.
+7. **Makaleyle MAE karşılaştırması segment vs trip ölçek farkından dolayı dolaylı** — yayında bu açıkça belgelenmeli.

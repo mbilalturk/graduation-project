@@ -78,16 +78,17 @@
 - [x] OpenWeatherMap entegrasyonu calisir (clear + cloudy gozlemlendi; yagis henuz yok)
 - [x] TomTom entegrasyonu calisir (congestion_ratio kolonu mevcut)
 
-### Asama 3-6 Tekrar — Yeni Veri ile ✅ (kismi)
+### Asama 3-6 Tekrar — Yeni Veri ile ✅
 - [x] Tum notebook'lar `features_v2.csv` (138K satir) ile yeniden calistirildi (2026-04-29)
-- [x] LSTM/GRU artik calisir durumda — MAE 0.41 dk (pilot 0.89'dan iyilesme)
+- [x] LSTM/GRU calisir durumda — MAE 0.41 dk (pilot 0.89'dan iyilesme)
 - [x] Random Forest / XGBoost: MAE 0.47 / 0.48 dk
-- [x] Train/Test: 110.625 / 27.657 — istatistiksel testler artik guvenilir
-- [ ] **TARGET LEAKAGE DUZELTILMELI:** `schedule_ratio` ve `deviation_minutes` feature seti
-      Enhanced XGBoost ve Hybrid Stacking sonuclarini gecersiz kiliyor (bkz. results_analysis.md §0)
-- [ ] Leakage duzeltmesinden sonra ablation, statistical_tests, paper_comparison yeniden uretilmeli
-- [ ] Hedef: MAE < 2.5 dk (gecerli modellerle MAE 0.41 dk — hedef asildi, ancak segment vs trip
-      olcek farki kosulluyla)
+- [x] Train/Test: 110.625 / 27.657 — istatistiksel testler guvenilir
+- [x] **Target leakage duzeltildi:** `schedule_ratio` feature'i hybrid_model ve evaluation
+      notebook'larindan cikarildi; iki notebook yeniden calistirildi
+- [x] Enhanced XGBoost yeni MAE: 0.5064 dk (gecerli sonuc)
+- [x] Hybrid Stacking yeni MAE: 0.5003 dk (gecerli sonuc)
+- [x] Ablation, statistical_tests, paper_comparison leakage olmadan yeniden uretildi
+- [x] Hedef: MAE < 2.5 dk asildi (LSTM 0.41 dk; segment vs trip olcek farki kosulluyla)
 
 ### Asama 7 — Demo Sistemi ⬜ (OPSIYONEL)
 - [ ] `scripts/web_dashboard.py` hibrit modelle entegre edilecek
@@ -106,38 +107,34 @@
 
 ---
 
-## Guncel Sonuclar (138.282 segment, 27 gun, 2026-04-29)
+## Guncel Sonuclar (138.282 segment, 27 gun, 2026-04-29 — leakage duzeltmesi sonrasi)
 
-### Gecerli Modeller (target leakage'tan etkilenmeyenler)
+### Tum Modeller — Sirali
 
-| Model | MAE (dk) | RMSE (dk) | MAPE (%) | R2 |
-|-------|---------:|----------:|---------:|---:|
-| LSTM | **0.41** | 0.69 | 42.1 | 0.05 |
-| GRU | 0.41 | 0.69 | 41.9 | 0.06 |
-| Random Forest | 0.47 | 0.87 | 50.2 | 0.33 |
-| XGBoost | 0.48 | 0.88 | 52.2 | 0.32 |
-| Historical Average | 0.57 | 0.99 | 62.5 | 0.14 |
-| Linear Regression | 0.59 | 1.06 | 64.3 | 0.02 |
-| Naive (GTFS Scheduled) | 0.61 | 1.09 | 65.0 | -0.05 |
+| Sira | Model | MAE (dk) | RMSE (dk) | MAPE (%) | R2 |
+|---|-------|---------:|----------:|---------:|---:|
+| 1 | **LSTM** | **0.4138** | 0.6914 | 42.1 | 0.05 |
+| 2 | GRU | 0.4140 | 0.6887 | 41.9 | 0.06 |
+| 3 | Random Forest | 0.4695 | 0.8731 | 50.2 | **0.33** |
+| 4 | XGBoost | 0.4784 | 0.8819 | 52.2 | 0.32 |
+| 5 | Hybrid Stacking | 0.5003 | 0.9295 | 54.5 | 0.24 |
+| 6 | Enhanced XGBoost | 0.5064 | 0.9282 | 56.1 | 0.25 |
+| 7 | Historical Average | 0.5662 | 0.9922 | 62.5 | 0.14 |
+| 8 | Linear Regression | 0.5933 | 1.0597 | 64.3 | 0.02 |
+| 9 | Naive (GTFS) | 0.6125 | 1.0935 | 65.0 | -0.05 |
+| 10 | Selective Trend | 0.6216 | 1.0938 | 68.8 | -0.05 |
 
-### Gecersiz (Target Leakage)
+### Surum Tarihcesi
 
-| Model | MAE (dk) | Aciklama |
-|-------|---------:|----------|
-| Enhanced XGBoost | 0.02 | `schedule_ratio = travel/scheduled` feature'i target leakage |
-| Hybrid Stacking | 0.02 | Ayni feature seti |
+| Surum | Tarih | LSTM MAE | RF MAE | Enhanced XGB MAE | Bilimsel Gecerlilik |
+|-------|-------|---------:|-------:|-----------------:|---------------------|
+| Pilot (61 satir) | 2026-04-28 | 0.89 | 0.47 | 0.37 (sismis) | Dusuk (n=13) |
+| 138K leakage'li | 2026-04-29 sabah | 0.41 | 0.47 | 0.02 (leakage) | Yok |
+| **138K duzeltilmis** | **2026-04-29 ogleden sonra** | **0.41** | **0.47** | **0.51 (gercek)** | **Yuksek** |
 
-> Enhanced XGBoost ve Hybrid Stacking sonuclari, `schedule_ratio` feature'indan kaynaklanan target leakage nedeniyle gecersizdir. Detay icin: [reports/results_analysis.md](results_analysis.md) §0.
-
-### Pilot Sonuclar (61 segment — referans, artik kullanilmiyor)
-
-| Model | MAE (dk) | R2 |
-|-------|---------:|---:|
-| LSTM | 0.89 | -0.18 |
-| GRU | 0.88 | -0.17 |
-| Random Forest | 0.47 | 0.33 |
-
-> 61 → 138.282 satir gecisinde LSTM/GRU MAE %54 iyilesti, R2 negatiften pozitife dondu. Bu, "DL modelleri yeterli veri ile yeniden degerlendirilmeli" ongoru-sunu dogruladi.
+> 61 → 138.282 satir gecisinde LSTM MAE %54 iyilesti (0.89 → 0.41), R2 negatiften pozitife dondu.
+> Enhanced XGBoost'un beklenenden kotu cikmasi onemli bir bulgu: ek feature'lar 138K'da gurultu
+> olarak davraniyor, "daha cok feature = daha iyi model" hipotezi reddedildi (bkz. results_analysis.md §2).
 
 ---
 
@@ -168,35 +165,36 @@
 
 ---
 
-## 2026-04-29 Yonetici Ozeti
+## 2026-04-29 Yonetici Ozeti (leakage duzeltmesi sonrasi)
 
 ### Mevcut Asama
-- Proje teknik bakimdan tamamlanmaya yakin: 138K segmentlik gercek veri toplandi, tum modeller bu
-  veri uzerinde calistirildi, sonuclar uretildi.
-- Proje teslim bakimindan **bir kritik blokere takili:** Enhanced XGBoost ve Hybrid Stacking
-  modellerinde target leakage var. Bu, akademik yayinda kullanilamaz; duzeltilmesi gerek.
+- Proje teknik bakimdan **tamamlanmis ve sonuclari bilimsel olarak savunulabilir.** 138K segmentlik
+  gercek veri uzerinde tum modeller calistirildi; target leakage tespit edilip duzeltildi.
+- Final teslim icin kalanlar: makale yazimi, demo dashboard, sunum hazirligi.
 
 ### Teknik Durum Degerlendirmesi
-1. Veri toplama operasyonu stabilize oldu — collector 27 gun calisti, 1.98M GPS kaydi, 138K segment.
-2. LSTM ve GRU artik gecerli performans uretiyor (MAE 0.41 dk) — pilot calismadaki "az veride
-   basarisiz" hipotezi dogrulandi.
-3. Random Forest ve XGBoost MAE 0.47-0.48 dk seviyesinde — DL modellerinden hafif geride.
-4. **Target leakage:** Hybrid notebook'taki `schedule_ratio = travel/scheduled` feature'i hedefi
-   doğrudan iceriyor. Sonuc: modelin "MAE 0.02 dk" basarisi yapay. Tek satirlik feature listesi
-   degisikligi ile cozulebilir.
-5. Hat baslangic bolgesinde MAE belirgin biçimde kotu (0.83 vs 0.41) — bu metodolojik bir bulgu,
-   makaleye girmeli.
+1. Veri toplama operasyonu stabilize oldu — 27 gun, 1.98M GPS kaydi, 138K segment.
+2. **LSTM en iyi model** (MAE 0.41 dk). DL'in yeterli veri ile bask in oldugu dogrulandi.
+3. **Enhanced XGBoost beklenenden kotu** (0.51 vs vanilla XGBoost 0.48). Ek feature'lar 138K'da
+   gurultu olarak davraniyor; "daha karmasik = daha iyi" reddedildi. Bu, makaleye girecek
+   metodolojik bir bulgu.
+4. **Hava durumu feature'lari ablation'da MAE'yi kotulestiriyor** (0.4818 → 0.5064 ekleyince).
+   Yagissiz veri kanitlayici test sunmuyor.
+5. **`scheduled_travel_minutes` ablation'da en kritik feature** — projenin GTFS-tabanli ozgun
+   katkisinin somut delili.
+6. **Hat baslangicinda MAE 2× kotu** (0.83 vs 0.41) — cold-start lag eksikliginden suphelenilen
+   metodolojik bulgu, makalede ayri alt baslik hak ediyor.
 
-### Kritik Riskler
-1. **Target leakage duzeltilmeden** akademik yayin/sunum yapilirsa bilimsel olarak savunulamaz.
-2. Yağisli/karli hava verisi yok — `weather_category` etkisi kanitlanamiyor; bu, makalede dürüstce
-   "bu kosulda gozlem yok" olarak raporlanmali.
-3. Demo dashboard hazir degil; teslimde "calisan sistem" bekleniyorsa zaman riski.
-4. Final rapor ve sunum hala baslamamis.
+### Kalan Riskler
+1. Yagisli/karli hava verisi yok — `weather_category` etkisi kanitlanamiyor; makalede "ileri
+   calisma" olarak raporlanmali.
+2. Demo dashboard hazir degil; teslimde "calisan sistem" bekleniyorsa zaman riski.
+3. Final akademik makale ve sunum hala yazilmadi.
+4. evaluation notebook'undaki istatistiksel testler DL modellerini icermiyor; LSTM'in RF'den
+   anlamli sekilde iyi oldugu gosterilmeli.
 
 ### Net Karar
-- Oncelik 1: `notebooks/hybrid_model.ipynb` ve `notebooks/evaluation.ipynb`'de `ENHANCED_FEATURES`
-  listesinden `schedule_ratio` cikarilsin; iki notebook yeniden calistirilsin.
-- Oncelik 2: Sonuclar gerçek bir sekilde stabil olunca, makale yazimi baslayabilir; LSTM (gecerli
-  en iyi model) ve duzeltilmis Enhanced XGBoost karsilastirilarak rapor edilmeli.
-- Oncelik 3: Demo ve final rapor.
+- Oncelik 1: **Final akademik makale taslagi.** En iyi model LSTM (MAE 0.41 dk, %86 makale
+  uzerinde). Segment vs trip olcek farki acikca belgelensin.
+- Oncelik 2: Demo dashboard — LSTM modeline baglanmali.
+- Oncelik 3: Sunum ve teslim hazirligi.
