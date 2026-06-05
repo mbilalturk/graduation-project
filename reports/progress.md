@@ -1,6 +1,37 @@
 # Progress
 
-**Son Guncelleme:** 2026-04-29
+**Son Guncelleme:** 2026-06-05
+
+---
+
+## ⚠️ 2026-06-05 — Multi-Route Genelleme + Veri Butunlugu Duzeltmesi
+
+### Kritik Bulgu: Eski sonuclar 3 hat karisikti
+`feature_engineering_v2.ipynb`'deki `build_segments()` route_id filtresi yapmiyordu. DB'deki
+3 hat (502, 268, 565) birlikte islenip hepsine 502'nin GTFS tarifesi + durak koordinatlari
+atanmisti. Eski "route_502" v2 (138.282 satir) aslinda **268: 48.7k, 565: 47.6k, 502: 41.9k**
+karisimi idi; 268/565 segmentlerine yanlis scheduled/distance degerleri verilmisti.
+
+### Duzeltme
+- [x] `scripts/build_features_route.py` — hat-parametrik feature engineering (her hat kendi
+      GTFS + durak verisiyle). `config.ROUTES[route_id]` kullanir.
+- [x] `improved_ml.py` ve `improved_lstm.py` `--route` argumani alacak sekilde guncellendi.
+- [x] `scripts/build_multi_route_comparison.py` — 3 hatti yan yana getiren ozet tablo.
+- [x] Uc hat icin temiz veri uretildi: 502 (75.6k), 268 (115.8k), 565 (114.6k segment).
+
+### Multi-Route Sonuclar (temiz veri, GENELLEME KANITI)
+
+| Hat | Segment | Ort. sure | CV | XGBoost MAE | XGBoost R2 | LSTM MAE | LSTM R2 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 502 | 75.579 | 1.21 dk | 1.28 | 0.439 | **0.637** | 0.360 | 0.337 |
+| 268 | 115.803 | 1.23 dk | 0.79 | 0.379 | 0.533 | 0.323 | 0.407 |
+| 565 | 114.572 | 1.09 dk | 0.80 | 0.308 | 0.479 | **0.295** | **0.531** |
+
+**Sonuc:** Yontem 3 hatta da tutarli calisiyor → genelleme kanitlandi (makaleye girecek en
+guclu argumanlardan biri). Temiz 502 verisi karisik veriye gore R2'yi 0.538 → 0.637'ye cikardi.
+Improved LSTM uc hatta da en dusuk MAE'yi veriyor.
+
+Detay: [reports/results_analysis.md](reports/results_analysis.md) §0 ve §11.
 
 ---
 

@@ -1,0 +1,5 @@
+model,MAE (dk),RMSE (dk),MAPE (%),R2
+XGBoost Improved (log-transform),0.3793,0.6514,37.44,0.5327
+RF Improved (log-transform),0.3831,0.6524,38.27,0.5313
+RF Segment Bazli (Mixture of Experts),0.3864,0.7057,38.96,0.4515
+RF Baseline (orijinal),0.4025,0.7186,41.88,0.4312

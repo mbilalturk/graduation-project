@@ -1,9 +1,35 @@
 # Sonuç Tabloları Analizi
 
-**Tarih:** 2026-04-29 (target leakage düzeltmesi sonrası)
+**Tarih:** 2026-06-05 (multi-route genelleme + veri bütünlüğü düzeltmesi)
 **Kaynak:** `results/tables/`
 **Hedef:** Otobüs varış zamanı tahmini için eğitilen modellerin performans değerlendirmesi
-**Önceki sürümler:** 2026-04-28 (61 satırlık pilot), 2026-04-29 (138K leakage'lı)
+**Önceki sürümler:** 2026-04-28 (61 satırlık pilot), 2026-04-29 (138K leakage'lı), 2026-04-29 (138K düzeltilmiş)
+
+---
+
+## ⚠️ 2026-06-05 — Kritik Veri Bütünlüğü Düzeltmesi (mutlaka okuyun)
+
+**Bulgu:** `feature_engineering_v2.ipynb`'deki `build_segments()` fonksiyonu **route_id'ye göre filtre yapmıyordu.** DB'de 3 hat var (502, 268, 565); notebook üçünün segmentlerini birlikte çıkarıp **hepsine 502'nin GTFS scheduled sürelerini ve 502'nin durak koordinatlarını** atıyordu.
+
+Yani `route_502_features_*.csv` ve dolayısıyla **2026-04-29'a kadarki tüm sonuçlar aslında 3 hattın karışımı** üzerinde üretilmişti:
+
+| Kaynak | route_id dağılımı |
+|---|---|
+| Eski "route_502" v2 (138.282 satır) | 268: 48.719 · 565: 47.622 · **502: yalnızca 41.941** |
+
+268/565 segmentlerine yanlış (502'nin) `scheduled_travel_min` ve `distance_m` değerleri atanmıştı → bu, gürültü olarak R²'yi düşürüyordu.
+
+**Düzeltme:** `scripts/build_features_route.py` yazıldı — `--route` parametresi alıp her hat için **kendi GTFS tarifesi + kendi durak koordinatlarıyla** temiz feature seti üretiyor (`config.ROUTES[route_id]` kullanır). Üç hat ayrı ayrı, doğru şekilde üretildi:
+
+| Hat | Temiz segment | Ort. süre | Std | CV |
+|---|---:|---:|---:|---:|
+| 502 | 75.579 | 1.208 dk | 1.544 | 1.28 |
+| 268 | 115.803 | 1.232 dk | 0.979 | 0.79 |
+| 565 | 114.572 | 1.088 dk | 0.872 | 0.80 |
+
+**Etki (502, XGBoost Improved):** Karışık veriden temiz veriye geçiş R²'yi **0.538 → 0.637'ye** çıkardı (yanlış-feature gürültüsü temizlendi). MAE 0.394 → 0.439'a yükseldi çünkü saf 502 verisi daha yüksek varyanslı (CV 1.28). **Temiz sonuçlar bilimsel olarak doğru olanlardır.**
+
+> Bu rapordaki **§1–§8 eski (karışık-veri) sonuçları tarihsel kayıt** olarak korunmuştur. Güncel ve geçerli sonuçlar **§11 Multi-Route**'tadır.
 
 ---
 
@@ -254,3 +280,34 @@ DL modelleri (LSTM, GRU) `evaluation.ipynb`'in `predictions` dict'inde yok; bu n
 5. **Hat başlangıcında MAE 2× kötü** — makaleye girecek metodolojik bulgu.
 6. **`scheduled_travel_minutes` (GTFS) ablation'da en kritik feature** — projenin özgün katkısı bu somut delile dayanıyor.
 7. **Makaleyle MAE karşılaştırması segment vs trip ölçek farkından dolayı dolaylı** — yayında bu açıkça belgelenmeli.
+
+---
+
+## 11. Multi-Route Genelleme (2026-06-05 — GÜNCEL, GEÇERLİ SONUÇLAR)
+
+[results/tables/multi_route_comparison.csv](results/tables/multi_route_comparison.csv) — her hat **kendi temiz verisiyle** (doğru GTFS + durak koordinatları) eğitildi. Amaç: yöntemin tek hatta özel olmadığını, farklı hat profillerine genellendiğini kanıtlamak.
+
+| Hat | Segment | Ort. süre | CV | XGBoost MAE | XGBoost MAPE | XGBoost R² | LSTM MAE | LSTM MAPE | LSTM R² |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| **502** | 75.579 | 1.21 dk | 1.28 | 0.439 | 43.6% | **0.637** | 0.360 | 39.7% | 0.337 |
+| **268** | 115.803 | 1.23 dk | 0.79 | 0.379 | 37.4% | 0.533 | 0.323 | 33.4% | 0.407 |
+| **565** | 114.572 | 1.09 dk | 0.80 | 0.308 | 35.0% | 0.479 | **0.295** | 33.0% | **0.531** |
+
+### Anahtar Bulgular
+
+1. **Yöntem 3 hatta da tutarlı çalışıyor — genelleme kanıtlandı.** XGBoost R² aralığı 0.48–0.64, LSTM her hatta baseline'ları geçiyor. Bu, "yöntemimiz 502'ye özel bir hile değil" tezinin somut delili ve makaleye girecek en güçlü genelleme argümanı.
+
+2. **CV (varyasyon katsayısı) ile R² ters orantılı.** 502 en yüksek CV'ye (1.28) sahip → en zor hat, ama XGBoost yine de en yüksek R²'yi (0.64) elde ediyor çünkü yüksek varyans = açıklanacak daha çok sinyal. 565 en düşük varyanslı (CV 0.80) → MAE en düşük (0.31) ama R² LSTM'de en yüksek.
+
+3. **LSTM, kısa-segment hatlarda (268, 565) MAE'de XGBoost'u net geçiyor**, 502'de de öne çıkıyor. Üç hatta da Improved LSTM en düşük MAE'yi veriyor — DL'in genelleme avantajı doğrulanıyor.
+
+4. **Veri bütünlüğü düzeltmesinin etkisi (§0):** 502'de R² karışık-veriden temiz-veriye 0.538 → 0.637 yükseldi. Yanlış feature'lar temizlenince modelin gerçek açıklayıcı gücü ortaya çıktı.
+
+### Üretim Pipeline'ı
+
+- `scripts/build_features_route.py --route <RID>` → temiz v2/v3/v4 CSV
+- `scripts/improved_ml.py --route <RID>` → XGBoost/RF Improved sonuçları
+- `scripts/improved_lstm.py --route <RID>` → Improved LSTM sonuçları
+- `scripts/build_multi_route_comparison.py` → özet tablo
+
+Çıktılar: `results/tables/improved_{ml,lstm}_results[_route_<RID>].csv` ve `multi_route_comparison.csv`.

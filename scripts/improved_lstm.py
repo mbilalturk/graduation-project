@@ -21,6 +21,7 @@ Kullanim:
 """
 
 import os
+import argparse
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -32,12 +33,18 @@ from torch.utils.data import DataLoader, TensorDataset
 from sklearn.preprocessing import MinMaxScaler, LabelEncoder
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
+# ── Hat parametresi ───────────────────────────────────────────────────────────
+_ap = argparse.ArgumentParser()
+_ap.add_argument("--route", type=int, default=502, help="route_id (502, 268, 565)")
+_args, _ = _ap.parse_known_args()
+ROUTE_ID = _args.route
+
 # ── Yollar ────────────────────────────────────────────────────────────────────
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
-CSV_V4       = os.path.join(PROJECT_ROOT, "collected_data", "route_502_features_v4.csv")
-CSV_V3       = os.path.join(PROJECT_ROOT, "collected_data", "route_502_features_v3.csv")
-CSV_V2       = os.path.join(PROJECT_ROOT, "collected_data", "route_502_features_v2.csv")
+CSV_V4       = os.path.join(PROJECT_ROOT, "collected_data", f"route_{ROUTE_ID}_features_v4.csv")
+CSV_V3       = os.path.join(PROJECT_ROOT, "collected_data", f"route_{ROUTE_ID}_features_v3.csv")
+CSV_V2       = os.path.join(PROJECT_ROOT, "collected_data", f"route_{ROUTE_ID}_features_v2.csv")
 RESULTS_DIR  = os.path.join(PROJECT_ROOT, "results")
 MODELS_DIR   = os.path.join(PROJECT_ROOT, "models")
 
@@ -325,26 +332,29 @@ print(f"RMSE : {rmse:.4f} dk")
 print(f"MAPE : {mape:.2f}%")
 print(f"R2   : {r2:.4f}")
 
-# Baseline ile karsilastirma
+# Baseline ile karsilastirma — referans degerler SADECE 502 icin gecerli
+# (Baseline LSTM yalnizca 502 verisinde egitilmisti; 268/565 icin karsilastirma yapilmaz)
 BASE_MAE, BASE_MAPE, BASE_R2 = 0.4138, 42.11, 0.0484
-print(f"\n--- Baseline LSTM ile Karsilastirma ---")
-print(f"MAE  : {BASE_MAE:.4f} -> {mae:.4f}  ({mae - BASE_MAE:+.4f} dk, {(mae - BASE_MAE)/BASE_MAE*100:+.1f}%)")
-print(f"MAPE : {BASE_MAPE:.2f}% -> {mape:.2f}%  ({mape - BASE_MAPE:+.2f}%)")
-print(f"R2   : {BASE_R2:.4f} -> {r2:.4f}  ({r2 - BASE_R2:+.4f})")
+if ROUTE_ID == 502:
+    print(f"\n--- Baseline LSTM ile Karsilastirma ---")
+    print(f"MAE  : {BASE_MAE:.4f} -> {mae:.4f}  ({mae - BASE_MAE:+.4f} dk, {(mae - BASE_MAE)/BASE_MAE*100:+.1f}%)")
+    print(f"MAPE : {BASE_MAPE:.2f}% -> {mape:.2f}%  ({mape - BASE_MAPE:+.2f}%)")
+    print(f"R2   : {BASE_R2:.4f} -> {r2:.4f}  ({r2 - BASE_R2:+.4f})")
 
 # ── Sonuclari kaydet ──────────────────────────────────────────────────────────
-results_df = pd.DataFrame([
-    {"model": "Improved LSTM", "MAE (dk)": round(mae, 4), "RMSE (dk)": round(rmse, 4),
-     "MAPE (%)": round(mape, 2), "R2": round(r2, 4)},
-    {"model": "Baseline LSTM", "MAE (dk)": BASE_MAE, "RMSE (dk)": 0.6914,
-     "MAPE (%)": BASE_MAPE, "R2": BASE_R2},
-])
-results_path = os.path.join(RESULTS_DIR, "tables", "improved_lstm_results.csv")
+_rows = [{"model": "Improved LSTM", "MAE (dk)": round(mae, 4), "RMSE (dk)": round(rmse, 4),
+          "MAPE (%)": round(mape, 2), "R2": round(r2, 4)}]
+if ROUTE_ID == 502:
+    _rows.append({"model": "Baseline LSTM", "MAE (dk)": BASE_MAE, "RMSE (dk)": 0.6914,
+                  "MAPE (%)": BASE_MAPE, "R2": BASE_R2})
+results_df = pd.DataFrame(_rows)
+suffix = "" if ROUTE_ID == 502 else f"_route_{ROUTE_ID}"
+results_path = os.path.join(RESULTS_DIR, "tables", f"improved_lstm_results{suffix}.csv")
 results_df.to_csv(results_path, index=False)
 print(f"\nSonuclar kaydedildi: {results_path}")
 
 # ── Modeli kaydet ─────────────────────────────────────────────────────────────
-model_path = os.path.join(MODELS_DIR, "improved_lstm.pt")
+model_path = os.path.join(MODELS_DIR, f"improved_lstm{suffix}.pt")
 torch.save({
     "model_state_dict"  : best_state,
     "n_seq_feats"       : n_seq_feats,

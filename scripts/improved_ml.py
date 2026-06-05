@@ -19,6 +19,7 @@ Kullanim:
 """
 
 import os
+import argparse
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -34,12 +35,18 @@ except ImportError:
     HAS_XGB = False
     print("XGBoost bulunamadi — RF sonuclari gosterilecek")
 
+# ── Hat parametresi ───────────────────────────────────────────────────────────
+_ap = argparse.ArgumentParser()
+_ap.add_argument("--route", type=int, default=502, help="route_id (502, 268, 565)")
+_args, _ = _ap.parse_known_args()
+ROUTE_ID = _args.route
+
 # ── Yollar ────────────────────────────────────────────────────────────────────
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
-CSV_V4       = os.path.join(PROJECT_ROOT, "collected_data", "route_502_features_v4.csv")
-CSV_V3       = os.path.join(PROJECT_ROOT, "collected_data", "route_502_features_v3.csv")
-CSV_V2       = os.path.join(PROJECT_ROOT, "collected_data", "route_502_features_v2.csv")
+CSV_V4       = os.path.join(PROJECT_ROOT, "collected_data", f"route_{ROUTE_ID}_features_v4.csv")
+CSV_V3       = os.path.join(PROJECT_ROOT, "collected_data", f"route_{ROUTE_ID}_features_v3.csv")
+CSV_V2       = os.path.join(PROJECT_ROOT, "collected_data", f"route_{ROUTE_ID}_features_v2.csv")
 RESULTS_DIR  = os.path.join(PROJECT_ROOT, "results")
 
 os.makedirs(os.path.join(RESULTS_DIR, "tables"), exist_ok=True)
@@ -280,13 +287,14 @@ print(f"\n{'='*65}")
 print("TAM KARSILASTIRMA TABLOSU")
 print(f"{'='*65}")
 
-# Baseline metrikleri ekle
-results.extend([
-    {"model": "RF Baseline Ref (from notebook)", "MAE (dk)": 0.4695, "RMSE (dk)": 0.8731,
-     "MAPE (%)": 50.22, "R2": 0.3325},
-    {"model": "LSTM Baseline Ref",               "MAE (dk)": 0.4138, "RMSE (dk)": 0.6914,
-     "MAPE (%)": 42.11, "R2": 0.0484},
-])
+# Baseline metrikleri ekle — referans degerler SADECE 502 icin gecerli
+if ROUTE_ID == 502:
+    results.extend([
+        {"model": "RF Baseline Ref (from notebook)", "MAE (dk)": 0.4695, "RMSE (dk)": 0.8731,
+         "MAPE (%)": 50.22, "R2": 0.3325},
+        {"model": "LSTM Baseline Ref",               "MAE (dk)": 0.4138, "RMSE (dk)": 0.6914,
+         "MAPE (%)": 42.11, "R2": 0.0484},
+    ])
 
 results_df = pd.DataFrame(results).sort_values("MAE (dk)")
 print(results_df.to_string(index=False))
@@ -304,6 +312,8 @@ print(f"  MAPE : {50.22:.2f}% -> {r_rf['MAPE (%)']:.2f}%  ({r_rf['MAPE (%)'] - 5
 print(f"  R2   : {0.3325:.4f} -> {r_rf['R2']:.4f}  ({r_rf['R2'] - 0.3325:+.4f})")
 
 # ── Kaydet ───────────────────────────────────────────────────────────────────
-out_path = os.path.join(RESULTS_DIR, "tables", "improved_ml_results.csv")
+# Hat 502 icin geriye-donuk uyumlu isim; diger hatlar icin route'lu isim
+suffix = "" if ROUTE_ID == 502 else f"_route_{ROUTE_ID}"
+out_path = os.path.join(RESULTS_DIR, "tables", f"improved_ml_results{suffix}.csv")
 results_df.to_csv(out_path, index=False)
 print(f"\nSonuclar kaydedildi: {out_path}")
