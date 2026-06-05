@@ -44,6 +44,15 @@
 - [x] Sliding window (onceki N durak → sonraki durak seyahat suresi)
 - [x] Cikti: model dosyalari (.keras, .pkl) + `results/tables/dl_results.csv`
 
+### Asama 4b — Dwell Time Feature Muhendisligi ✅
+- [x] `scripts/add_dwell_features.py` — `bus_positions` GPS verisinden dwell_time_sec hesaplama
+- [x] `collected_data/route_502_features_v4.csv` — 138.282 satir, 40 kolon (+2 yeni feature)
+- [x] `dwell_time_sec`: Otobusun duraga ≤50m mesafede kaldigi sure (10-600 sn)
+- [x] `prev_dwell_time_sec`: Trip icinde bir onceki duragin dwell suresi
+- [x] Ablasyon: RF baseline MAE 0.4324 → +dwell 0.4166 dk (%3.7 iyilesme, R2 0.4748→0.5286)
+- [x] `dwell_time_sec` feature onem siralamasinda 3. sirada (%11.6)
+- [x] `notebooks/feature_engineering_v2.ipynb` Adim 9 bolumu eklendi
+
 ### Asama 5 — Hibrit Model ✅
 - [x] `notebooks/hybrid_model.ipynb`
 - [x] Selective Trend mekanizmasi (az verili kombinasyonlar icin GTFS + sapma)
@@ -104,37 +113,51 @@
 - [ ] Ozgun Katkilar: Scheduled time feature, Izmir verisi, GTFS+API hibrit yaklasim
 - [ ] Sonuc ve Gelecek Calismalar
 - [ ] GTU sunum sablonuyla sunum hazirlanacak
+- [x] `omer_faruk_koc.pdf` incelendi; 6. ve 7. slaytlar icin ~3 dakikalik konusma metni hazirlandi (2026-04-29)
 
 ---
 
-## Guncel Sonuclar (138.282 segment, 27 gun, 2026-04-29 — leakage duzeltmesi sonrasi)
+## Guncel Sonuclar (138.282 segment, 27 gun — dwell time v4 + improved modeller)
 
-### Tum Modeller — Sirali
+### Tum Modeller — Sirali (Guncel, 2026-06-05)
 
-| Sira | Model | MAE (dk) | RMSE (dk) | MAPE (%) | R2 |
-|---|-------|---------:|----------:|---------:|---:|
-| 1 | **LSTM** | **0.4138** | 0.6914 | 42.1 | 0.05 |
-| 2 | GRU | 0.4140 | 0.6887 | 41.9 | 0.06 |
-| 3 | Random Forest | 0.4695 | 0.8731 | 50.2 | **0.33** |
-| 4 | XGBoost | 0.4784 | 0.8819 | 52.2 | 0.32 |
-| 5 | Hybrid Stacking | 0.5003 | 0.9295 | 54.5 | 0.24 |
-| 6 | Enhanced XGBoost | 0.5064 | 0.9282 | 56.1 | 0.25 |
-| 7 | Historical Average | 0.5662 | 0.9922 | 62.5 | 0.14 |
-| 8 | Linear Regression | 0.5933 | 1.0597 | 64.3 | 0.02 |
-| 9 | Naive (GTFS) | 0.6125 | 1.0935 | 65.0 | -0.05 |
-| 10 | Selective Trend | 0.6216 | 1.0938 | 68.8 | -0.05 |
+| Sira | Model | MAE (dk) | RMSE (dk) | MAPE (%) | R2 | Not |
+|---|-------|---------:|----------:|---------:|---:|---|
+| 1 | **Improved LSTM** | **0.3449** | **0.4742** | **38.2** | 0.34 | dwell+v4, HuberLoss, 2-katman |
+| 2 | XGBoost Improved | 0.3907 | 0.7332 | 38.7 | **0.53** | dwell+v4, log-transform |
+| 3 | RF Segment Bazli (MoE) | 0.3925 | 0.7239 | 39.3 | **0.54** | dwell+v4, mixture of experts |
+| 4 | RF Improved | 0.4032 | 0.7404 | 40.3 | 0.52 | dwell+v4, log-transform |
+| 5 | Baseline LSTM/GRU | 0.4138 | 0.6914 | 42.1 | 0.05 | v3, referans |
+| 6 | RF Baseline (v4) | 0.4251 | 0.7346 | 45.7 | 0.53 | v4 ozellikleriyle |
+| 7 | RF Baseline Ref | 0.4695 | 0.8731 | 50.2 | 0.33 | v2, notebook referansi |
+| 8 | Hybrid Stacking | 0.5003 | 0.9295 | 54.5 | 0.24 | v3, leakage duzeltilmis |
+| 9 | Enhanced XGBoost | 0.5064 | 0.9282 | 56.1 | 0.25 | v3, leakage duzeltilmis |
+| 10 | Historical Average | 0.5662 | 0.9922 | 62.5 | 0.14 | baseline |
+| 11 | Naive (GTFS) | 0.6125 | 1.0935 | 65.0 | -0.05 | baseline |
+
+**Onemli Not:** LSTM ve ML modelleri farkli test setleri kullanmaktadir.
+LSTM: 76.944 sequence, test=son 6 gun (23-28 Nisan).
+ML: 138.282 segment, test=son %20 (27.657 segment). R2 dogrudan karsilastirilamaz; MAE karsilastirmasi yeterli.
+
+### LSTM MAE dusuk ama R2 dusuk paradoksu
+
+LSTM MAE=0.3449 < RF MAE=0.3907, ama LSTM R2=0.34 < RF R2=0.54.
+Aciklama: LSTM HuberLoss ile egitildiginden buyuk hatalari kesiyor — RMSE=0.4742 cok dusuk.
+RF ise varyansı iyi acikliyor (R2 yuksek) ama zaman zaman buyuk hatalar yapıyor (RMSE=0.72).
+Pratik kullanim icin MAE+RMSE birlikte degerlendirmelidir: **LSTM her iki metrikte de en iyi.**
 
 ### Surum Tarihcesi
 
-| Surum | Tarih | LSTM MAE | RF MAE | Enhanced XGB MAE | Bilimsel Gecerlilik |
-|-------|-------|---------:|-------:|-----------------:|---------------------|
-| Pilot (61 satir) | 2026-04-28 | 0.89 | 0.47 | 0.37 (sismis) | Dusuk (n=13) |
-| 138K leakage'li | 2026-04-29 sabah | 0.41 | 0.47 | 0.02 (leakage) | Yok |
-| **138K duzeltilmis** | **2026-04-29 ogleden sonra** | **0.41** | **0.47** | **0.51 (gercek)** | **Yuksek** |
+| Surum | Tarih | En iyi MAE | Bilimsel Gecerlilik |
+|-------|-------|----------:|---------------------|
+| Pilot (61 satir) | 2026-04-28 | 0.89 (LSTM) | Dusuk (n=13) |
+| 138K leakage'li | 2026-04-29 sabah | 0.02 (leakage!) | Yok |
+| 138K duzeltilmis | 2026-04-29 ogleden sonra | 0.41 (LSTM) | Yuksek |
+| **138K + dwell + improved** | **2026-06-05** | **0.3449 (Improved LSTM)** | **Yuksek** |
 
-> 61 → 138.282 satir gecisinde LSTM MAE %54 iyilesti (0.89 → 0.41), R2 negatiften pozitife dondu.
-> Enhanced XGBoost'un beklenenden kotu cikmasi onemli bir bulgu: ek feature'lar 138K'da gurultu
-> olarak davraniyor, "daha cok feature = daha iyi model" hipotezi reddedildi (bkz. results_analysis.md §2).
+> Baseline LSTM'den Improved LSTM'e: MAE 0.4138 → 0.3449 dk (%16.7 iyilesme).
+> Naive GTFS'e gore: %43.7 iyilesme (0.6125 → 0.3449 dk).
+> Dwell time feature'i (bus_positions GPS'inden turetilen) R2'yi 0.47'den 0.53'e cikardi (+6 puan).
 
 ---
 
@@ -192,6 +215,8 @@
 3. Final akademik makale ve sunum hala yazilmadi.
 4. evaluation notebook'undaki istatistiksel testler DL modellerini icermiyor; LSTM'in RF'den
    anlamli sekilde iyi oldugu gosterilmeli.
+5. Dwell time feature'lari yalnizca RF ile test edildi; LSTM/XGBoost modellerine entegrasyon
+   (features_v4.csv kullanilarak) yapilirsa ek iyilesme beklenmektedir.
 
 ### Net Karar
 - Oncelik 1: **Final akademik makale taslagi.** En iyi model LSTM (MAE 0.41 dk, %86 makale

@@ -1,34 +1,38 @@
 # Active Context
 
-**Son Guncelleme:** 2026-04-28
+**Son Guncelleme:** 2026-04-29
 
 ---
 
 ## Aktif Calisma Alanlari
 
-### 1. Veri Toplama (KRITIK - BEKLIYOR)
-- **Durum:** Collector kodu hazir ve test edildi, ancak surekli calistirilmiyor
-- **Sorun:** Henuz yeterli gercek zamanli veri toplanmadi. 20 dk'lik test verisi var (61 segment), hedef minimum 1 hafta (~3000 segment)
-- **Aksiyon:** `collector.py --interval 30` arka planda baslatilmali ve en az 1 hafta calistirilmali
-- **Etki:** Tum model sonuclari bu veriye bagimli. Veri toplamadan ilerlenemez.
+### 0. Dwell Time + Improved Modeller ✅ TAMAMLANDI (2026-06-05)
+- `scripts/add_dwell_features.py` ile `route_502_features_v4.csv` uretildi.
+- `scripts/improved_ml.py` ve `scripts/improved_lstm.py` v4 verisine guncellendi.
+- `improved_ml.py`: XGBoost Improved MAE=0.3907, RF MoE MAE=0.3925 (en iyi ML).
+- `improved_lstm.py`: 2 kritik leakage duzeltmesi yapildi —
+    (1) create_sequences kronolojik siralama eklendi,
+    (2) cumul_deviation/rolling_3_deviation sequence'dan context'e tasindi.
+- Improved LSTM MAE=0.3449 dk — baseline 0.4138'den %16.7 iyilesme.
+- Sonuclar `results/tables/improved_lstm_results.csv` ve `improved_ml_results.csv` dosyalarinda.
 
-### 2. TomTom Trafik Entegrasyonu ✅ TAMAMLANDI (2026-03-28)
-- TomTom Traffic Flow API entegrasyonu `collector.py`'ye eklendi
-- 31 segment orta noktasindan 20 dakikada bir trafik verisi toplanir
-- `traffic_readings` tablosu: current_speed, free_flow_speed, congestion_ratio, confidence
-- Gunluk ~2,232 istek (ucretsiz limit: 2,500/gun)
-- `TOMTOM_API_KEY` ortam degiskeni gerekli; key yoksa trafik verisi atlanir
+### 1. Final Teslim Paketleme (KRITIK - DEVAM EDIYOR)
+- **Durum:** Teknik pipeline tamam, modeller yeniden calistirildi ve leakage duzeltmesi sonrasi gecerli sonuclar uretildi.
+- **Odak:** Sonuclarin rapor, sunum ve varsa demo artefaktlarina donusturulmesi.
+- **Aksiyon:** Final rapor bolumlerini tamamla, metrikleri tek terminolojiyle senkronize et, sunum notlarini kapat.
 
-### 3. Pipeline Dogrulama ✅ TAMAMLANDI
-- Tum 5 notebook (feature_engineering → baseline → deep_learning → hybrid → evaluation) 20 dk test verisiyle basariyla calistirildi
-- Sonuc tablolari ve gorseller uretildi
-- Pipeline end-to-end calisiyor
+### 2. Sunum Hazirligi (AKTIF)
+- `omer_faruk_koc.pdf` incelendi; 6. ve 7. slaytlar icin konusma akisi cikarildi.
+- Ana mesajlar: LSTM'in en iyi model olmasi, cold-start bulgusu, veri kapsami sinirlari ve sonraki adimlar.
+- Kalan is: bu notlari nihai sunum dosyasina/konusmaci notlarina tasimak.
 
-### 4. Proje Dosya Temizligi ✅ TAMAMLANDI (2026-03-27)
-- Duplike veri klasorleri temizlendi (`izmir_dataset/` silindi, `data/` kaldi)
-- Eski plan dosyalari temizlendi (sadece `EXECUTION_PLAN.md` + `ROUTE_502_PILOT_PLAN.md` kaldi)
-- Root Python dosyalari `scripts/` altina tasindi
-- Duplike roadmap ve makale txt versiyonu silindi
+### 3. Demo Sistemi (ORTA ONCELIK)
+- `scripts/web_dashboard.py` hala model sonuclarina baglanmadi.
+- Teslimde canli gosterim bekleniyorsa entegrasyon zaman riski tasiyor.
+
+### 4. Veri Toplama ve Modelleme ✅ TAMAMLANDI
+- Collector 27 gun calisti; 138.282 segmentlik veriyle pipeline yeniden uretildi.
+- LSTM/GRU ve klasik modellerin sonuclari gecerlesti; leakage duzeltmesi kayda girdi.
 
 ---
 
@@ -36,21 +40,19 @@
 
 | # | Bloklayici | Etki | Cozum |
 |---|-----------|------|-------|
-| 1 | **Yetersiz gercek zamanli veri** | Modeller anlamli sonuc veremiyor (61 segment ile LSTM kotu) | Collector'i 1+ hafta surekli calistir |
-| 2 | **OpenWeatherMap API key yok** | Hava durumu mock veri ile calisiyor, gercek etki olculemiyor | Ucretsiz API key al ve env var olarak ayarla |
-| 3 | **TomTom API key yok** | Trafik verisi toplanamıyor | Ucretsiz TomTom developer hesabi ac ve key al |
-| 4 | **Demo sistemi entegre degil** | `web_dashboard.py` eski kod, hibrit modelle calismiyor | Asama 7'de guncellenecek (oncelik dusuk) |
+| 1 | **Yagisli/kis kosullari verisi yok** | Hava durumu feature etkisi guclu sekilde savunulamiyor | Yagisli donemde veri topla veya bunu acik sinirlilik olarak raporla |
+| 2 | **Demo sistemi entegre degil** | Canli gosterim/planned deployment zayif kaliyor | `web_dashboard.py`yi LSTM ya da secilen modelle entegre et |
+| 3 | **Sunum ve final rapor tam kapanmadi** | Teknik calisma teslim artefaktina donusmeyebilir | Sunum metni, rapor bolumleri ve sekil/tablo referanslarini tamamla |
+| 4 | **LSTM vs Random Forest anlamlilik testi eksik** | En iyi model iddiasi istatistiksel acidan eksik kalabilir | Evaluation notebook'una DL karsilastirmasini ekle |
 
 ---
 
 ## Yakin Vadeli Oncelikler (Sirali)
 
-1. **Collector'i baslatmak** — Minimum 1 hafta, ideal 2-4 hafta veri toplama
-2. **Veri kalite kontrolu** — 1. gun sonunda `trip_extractor.py --stats` ile dogrulama
-3. **Notebook'lari yeniden calistirmak** — Yeterli veri toplandiktan sonra tum pipeline
-4. **Sonuclari degerlendirmek** — MAE < 2.5 dk hedefine ulasildi mi?
-5. **Final rapor yazmak** — Asama 8
-6. **Demo sistemi** — Asama 7 (opsiyonel)
+1. **Final rapor yazimi** — Sonuclar, sinirliliklar ve ozgun katkilari tek bir dille kapat
+2. **Sunum sonlandirma** — Slayt anlatim akisi, konusmaci notlari ve sure yonetimini tamamla
+3. **LSTM vs RF istatistiksel testi** — En iyi model iddiasini formal olarak destekle
+4. **Demo sistemi** — Zaman kalirsa `web_dashboard.py`yi secilen modelle bagla
 
 ---
 
@@ -63,25 +65,25 @@
 
 ---
 
-## 2026-04-28 Durum Degerlendirmesi
+## 2026-04-29 Durum Degerlendirmesi
 
 ### Genel Sonuc
-- Proje su anda "teknik prototip tamam, operasyonel veri eksik" asamasinda.
-- End-to-end pipeline'in calistigi kanitlanmis durumda, ancak akademik olarak savunulabilir sonuclar icin veri hacmi halen yetersiz.
-- Teslim riskini belirleyen ana konu artik model gelistirme degil, veri toplamanin surekli ve temiz sekilde yurumesi.
+- Proje su anda "teknik calisma tamam, teslim artefaktlari kapatiliyor" asamasinda.
+- 27 gunluk veri ve leakage duzeltmesi sonrasi sonuclar savunulabilir; ana risk artik veri eksikligi degil, sonuclarin iyi paketlenmesi.
+- Sunum, rapor ve varsa demo entegrasyonu son kilometre isleri olarak one cikti.
 
 ### Kritik Gozlemler
-1. En buyuk bloklayici hala yeterli gercek zamanli veri eksikligi.
-2. 20 dakikalik test verisi pipeline dogrulamasi icin yeterli, performans iddialari icin yeterli degil.
-3. Hava ve trafik entegrasyonlari tasarlanmis, ancak gercek API anahtarlari olmadan bu feature'larin katkisi tam olculemiyor.
-4. Demo ve final rapor henuz tamamlanmadigi icin teknik ilerleme teslim artefaktlarina donusmemis durumda.
+1. LSTM en iyi model olarak ayrisiyor; bu mesaj sunumun merkezinde olmali.
+2. Cold-start ve sabah pik saati bulgulari metodolojik katkilar olarak vurgulanmali.
+3. Yagisli/kis verisinin eksikligi acik sinirlilik olarak korunmali; fazla genelleme yapilmamali.
+4. Demo ve final rapor tamamlanmadigi surece teknik ilerleme teslim avantajina tam donusmez.
 
 ### Dokumantasyon Tutarliligi Riski
 - Raporlarin bir kismi Mart sonu, bir kismi Nisan basi tarihli; durum ozetleri yeniden senkronize edilmeli.
 - Bazi raporlarda eski notebook veya veritabani isimleri geciyor; final teslim oncesi tek bir kanonik isimlendirme seti belirlenmeli.
 
 ### Bu Asamadaki Dogru Odak
-1. Collector'i kesintisiz calisir hale getirmek ve veri toplama periyodunu garanti altina almak.
-2. 24 saat sonra veri kalite kontrolu yapmak, ardindan 1+ haftalik birikimi beklemek.
-3. Yeterli veri gelince notebook zincirini yeniden calistirip tum metrikleri guncellemek.
-4. Son olarak demo ve final rapor/sunum ciktilarini kapatmak.
+1. Final rapor metnini ve gorsel referanslarini tamamlamak.
+2. Sunum notasini netlestirmek; her slaytin tek ana mesaji olmasini saglamak.
+3. Gerekirse LSTM vs RF anlamlilik testini ekleyip en iyi model sonucunu daha guclu savunmak.
+4. Zaman kalirsa demo entegrasyonunu tamamlamak.

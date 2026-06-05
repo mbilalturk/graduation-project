@@ -79,7 +79,7 @@ scp C:\yerel\dosya\yolu root@167.172.163.29:~/eshot-collector/
 ### Sunucudan kendi bilgisayarına dosya indir (PowerShell)
 
 ```powershell
-scp root@167.172.163.29:~/eshot-collector/collected_data/eshot_buses.db C:\Users\Bilal\Desktop\
+scp root@167.172.163.29:~/eshot-collector/collected_data/route_502_realtime.db C:\Users\Bilal\Desktop\
 ```
 
 ### Klasör yükle (PowerShell)
