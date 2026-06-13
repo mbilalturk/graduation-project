@@ -36,8 +36,11 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 # ── Hat parametresi ───────────────────────────────────────────────────────────
 _ap = argparse.ArgumentParser()
 _ap.add_argument("--route", type=int, default=502, help="route_id (502, 268, 565)")
+_ap.add_argument("--target", choices=["travel", "deviation"], default="travel",
+                 help="Hedef: travel=log1p(travel), deviation=travel-scheduled")
 _args, _ = _ap.parse_known_args()
 ROUTE_ID = _args.route
+TARGET_MODE = _args.target
 
 # ── Yollar ────────────────────────────────────────────────────────────────────
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
@@ -151,7 +154,7 @@ def create_sequences(df, window_size):
     tüm örnekler arrival_timestamp'e göre sıralanarak döndürülür,
     böylece train/test split tarihsel olarak temiz kalır.
     """
-    X_seq_list, X_ctx_list, y_list, ts_list = [], [], [], []
+    X_seq_list, X_ctx_list, y_list, sched_list, ts_list = [], [], [], [], []
     trip_groups = df.groupby(["bus_id", "yon", "trip_start_time"])
     skipped = 0
 
@@ -163,42 +166,53 @@ def create_sequences(df, window_size):
         seq_vals    = trip[SEQUENCE_FEATURES].values.astype(np.float32)
         ctx_vals    = trip[CONTEXT_FEATURES].values.astype(np.float32)
         target_vals = trip[TARGET].values.astype(np.float32)
+        sched_vals  = trip["scheduled_travel_minutes"].values.astype(np.float32)
         timestamps  = trip["arrival_timestamp"].values
 
         for i in range(window_size, len(trip)):
             X_seq_list.append(seq_vals[i - window_size:i])
             X_ctx_list.append(ctx_vals[i])
             y_list.append(target_vals[i])
+            sched_list.append(sched_vals[i])
             ts_list.append(timestamps[i])
 
     print(f"  Trip atlandı (kisa): {skipped}")
     if not X_seq_list:
-        return np.array([]), np.array([]), np.array([])
+        return np.array([]), np.array([]), np.array([]), np.array([])
 
     # Kronolojik sıralama — train/test split için kritik
     order = np.argsort(ts_list)
     return (np.array(X_seq_list, dtype=np.float32)[order],
             np.array(X_ctx_list, dtype=np.float32)[order],
-            np.array(y_list,     dtype=np.float32)[order])
+            np.array(y_list,     dtype=np.float32)[order],
+            np.array(sched_list, dtype=np.float32)[order])
 
 
 print(f"\nSequence olusturuluyor (window={WINDOW_SIZE})...")
-X_seq, X_ctx, y = create_sequences(df, WINDOW_SIZE)
+X_seq, X_ctx, y, y_sched = create_sequences(df, WINDOW_SIZE)
 print(f"X_seq: {X_seq.shape}  X_ctx: {X_ctx.shape}  y: {y.shape}")
-
-# ── Log-transform ─────────────────────────────────────────────────────────────
-# KEY CHANGE: log1p ile hedef degiskeni normalize et
-y_log = np.log1p(y)
-print(f"\nHedef (orijinal):  min={y.min():.3f}, max={y.max():.3f}, mean={y.mean():.3f}, std={y.std():.3f}")
-print(f"Hedef (log1p) :    min={y_log.min():.3f}, max={y_log.max():.3f}, mean={y_log.mean():.3f}, std={y_log.std():.3f}")
 
 # ── Train / Test bolme (kronolojik) ───────────────────────────────────────────
 split_idx = int(len(y) * 0.8)
 X_seq_tr, X_seq_te = X_seq[:split_idx], X_seq[split_idx:]
 X_ctx_tr, X_ctx_te = X_ctx[:split_idx], X_ctx[split_idx:]
-y_tr_log, y_te_log = y_log[:split_idx], y_log[split_idx:]
+sched_tr, sched_te = y_sched[:split_idx], y_sched[split_idx:]
 y_te_orig           = y[split_idx:]          # Geri donusum icin orijinal degerler
-print(f"\nTrain: {len(y_tr_log)}  Test: {len(y_te_log)}")
+
+# ── Hedef donusumu (Adim 4: travel vs deviation A/B) ──────────────────────────
+#   travel    : log1p(travel)      -> egitim;  expm1(pred)           -> tahmin
+#   deviation : travel - scheduled -> egitim;  scheduled + pred(clip) -> tahmin
+if TARGET_MODE == "deviation":
+    y_tr_t = y[:split_idx] - sched_tr      # sapma (signed), log YOK
+    y_te_t = y[split_idx:] - sched_te
+else:
+    y_tr_t = np.log1p(y[:split_idx])
+    y_te_t = np.log1p(y[split_idx:])
+
+print(f"\nHedef modu: {TARGET_MODE}")
+print(f"Hedef (egitim) : min={y_tr_t.min():.3f}, max={y_tr_t.max():.3f}, "
+      f"mean={y_tr_t.mean():.3f}, std={y_tr_t.std():.3f}")
+print(f"Train: {len(y_tr_t)}  Test: {len(y_te_t)}")
 
 # ── Normalizasyon (sadece train'den fit) ──────────────────────────────────────
 n_seq_feats = X_seq.shape[2]
@@ -259,14 +273,14 @@ print(f"Hedef: log1p(y)              [Baseline: y]")
 # ── Egitim ────────────────────────────────────────────────────────────────────
 Xs_tr = torch.tensor(X_seq_tr_n, dtype=torch.float32)
 Xc_tr = torch.tensor(X_ctx_tr_n, dtype=torch.float32)
-y_tr  = torch.tensor(y_tr_log,   dtype=torch.float32)
+y_tr  = torch.tensor(y_tr_t,     dtype=torch.float32)
 
 dataset = TensorDataset(Xs_tr, Xc_tr, y_tr)
 loader  = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
 val_Xs = torch.tensor(X_seq_te_n, dtype=torch.float32).to(DEVICE)
 val_Xc = torch.tensor(X_ctx_te_n, dtype=torch.float32).to(DEVICE)
-val_y  = torch.tensor(y_te_log,   dtype=torch.float32).to(DEVICE)
+val_y  = torch.tensor(y_te_t,     dtype=torch.float32).to(DEVICE)
 
 best_val_loss  = float("inf")
 best_state     = None
@@ -313,10 +327,13 @@ model.load_state_dict(best_state)
 # ── Degerlendirme ─────────────────────────────────────────────────────────────
 model.eval()
 with torch.no_grad():
-    y_pred_log = model(val_Xs, val_Xc).cpu().numpy()
+    y_pred_raw = model(val_Xs, val_Xc).cpu().numpy()
 
-# Log-transform geri al
-y_pred = np.expm1(y_pred_log)
+# Hedef donusumu geri al
+if TARGET_MODE == "deviation":
+    y_pred = sched_te + y_pred_raw
+else:
+    y_pred = np.expm1(y_pred_raw)
 y_pred = np.clip(y_pred, 0, None)
 
 mae  = mean_absolute_error(y_te_orig, y_pred)
@@ -349,7 +366,8 @@ if ROUTE_ID == 502:
     _rows.append({"model": "Baseline LSTM", "MAE (dk)": BASE_MAE, "RMSE (dk)": 0.6914,
                   "MAPE (%)": BASE_MAPE, "R2": BASE_R2})
 results_df = pd.DataFrame(_rows)
-suffix = "" if ROUTE_ID == 502 else f"_route_{ROUTE_ID}"
+mode_suffix = "" if TARGET_MODE == "travel" else "_deviation"
+suffix = ("" if ROUTE_ID == 502 else f"_route_{ROUTE_ID}") + mode_suffix
 results_path = os.path.join(RESULTS_DIR, "tables", f"improved_lstm_results{suffix}.csv")
 results_df.to_csv(results_path, index=False)
 print(f"\nSonuclar kaydedildi: {results_path}")

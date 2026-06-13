@@ -38,8 +38,11 @@ except ImportError:
 # ── Hat parametresi ───────────────────────────────────────────────────────────
 _ap = argparse.ArgumentParser()
 _ap.add_argument("--route", type=int, default=502, help="route_id (502, 268, 565)")
+_ap.add_argument("--target", choices=["travel", "deviation"], default="travel",
+                 help="Hedef: travel=log1p(travel_time), deviation=travel-scheduled")
 _args, _ = _ap.parse_known_args()
 ROUTE_ID = _args.route
+TARGET_MODE = _args.target
 
 # ── Yollar ────────────────────────────────────────────────────────────────────
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
@@ -123,16 +126,28 @@ if missing:
 
 X = df[available_features].values
 y = df[TARGET].values
+sched = df["scheduled_travel_min"].values   # deviation modu icin baz cizgi
 
 # ── Train / Test bolme ────────────────────────────────────────────────────────
 split_idx  = int(len(df) * 0.8)
 X_train    = X[:split_idx];       X_test    = X[split_idx:]
 y_train    = y[:split_idx];       y_test    = y[split_idx:]
+sched_train, sched_test = sched[:split_idx], sched[split_idx:]
 
-# Log-transform hedef
-y_train_log = np.log1p(y_train)
-y_test_log  = np.log1p(y_test)
+# ── Hedef donusumu (Adim 4: travel vs deviation A/B) ──────────────────────────
+#   travel    : log1p(travel)     -> egitim;  expm1(pred)           -> tahmin
+#   deviation : travel - scheduled -> egitim; scheduled + pred(clip) -> tahmin
+#   Gerekce: scheduled baz cizgiyi tasir; sapma sifir-merkezli, daha duragan.
+def to_target(y_raw, s_raw):
+    return (y_raw - s_raw) if TARGET_MODE == "deviation" else np.log1p(y_raw)
 
+def from_pred(pred, s_raw):
+    out = (s_raw + pred) if TARGET_MODE == "deviation" else np.expm1(pred)
+    return np.clip(out, 0, None)
+
+y_train_t = to_target(y_train, sched_train)
+
+print(f"Hedef modu : {TARGET_MODE}")
 print(f"Train: {len(y_train)}  Test: {len(y_test)}")
 
 # ── Metrik fonksiyonu ─────────────────────────────────────────────────────────
@@ -185,10 +200,8 @@ rf_imp = RandomForestRegressor(
     random_state=42,
     n_jobs=-1,
 )
-rf_imp.fit(X_train, y_train_log)
-y_pred_rf_log = rf_imp.predict(X_test)
-y_pred_rf     = np.expm1(y_pred_rf_log)
-y_pred_rf     = np.clip(y_pred_rf, 0, None)
+rf_imp.fit(X_train, y_train_t)
+y_pred_rf = from_pred(rf_imp.predict(X_test), sched_test)
 
 r_rf = evaluate(y_test, y_pred_rf, "RF Improved (log-transform)")
 results.append(r_rf)
@@ -225,10 +238,8 @@ if HAS_XGB:
         random_state=42,
         verbosity=0,
     )
-    xgb_imp.fit(X_train, y_train_log)
-    y_pred_xgb_log = xgb_imp.predict(X_test)
-    y_pred_xgb     = np.expm1(y_pred_xgb_log)
-    y_pred_xgb     = np.clip(y_pred_xgb, 0, None)
+    xgb_imp.fit(X_train, y_train_t)
+    y_pred_xgb = from_pred(xgb_imp.predict(X_test), sched_test)
 
     r_xgb = evaluate(y_test, y_pred_xgb, "XGBoost Improved (log-transform)")
     results.append(r_xgb)
@@ -265,10 +276,10 @@ for seg_label, lo, hi in segments:
     if n_tr < 20 or n_te == 0:
         print(f"  {seg_label}: yetersiz veri (train={n_tr}, test={n_te}) -> atlaniyor")
         # Fallback: genel modeli kullan
-        y_pred_seg[te_mask] = np.expm1(rf_imp.predict(X_test[te_mask]))
+        y_pred_seg[te_mask] = from_pred(rf_imp.predict(X_test[te_mask]), sched_test[te_mask])
         continue
 
-    X_tr_s = X_train[tr_mask];  y_tr_s = y_train_log[tr_mask]
+    X_tr_s = X_train[tr_mask];  y_tr_s = y_train_t[tr_mask]
     X_te_s = X_test[te_mask];   y_te_s = y_test[te_mask]
 
     rf_seg = RandomForestRegressor(
@@ -277,8 +288,7 @@ for seg_label, lo, hi in segments:
     )
     rf_seg.fit(X_tr_s, y_tr_s)
 
-    y_pred_part = np.expm1(rf_seg.predict(X_te_s))
-    y_pred_part = np.clip(y_pred_part, 0, None)
+    y_pred_part = from_pred(rf_seg.predict(X_te_s), sched_test[te_mask])
     y_pred_seg[te_mask] = y_pred_part
 
     seg_mae = mean_absolute_error(y_te_s, y_pred_part)
@@ -320,7 +330,8 @@ print(f"  R2   : {0.3325:.4f} -> {r_rf['R2']:.4f}  ({r_rf['R2'] - 0.3325:+.4f})"
 
 # ── Kaydet ───────────────────────────────────────────────────────────────────
 # Hat 502 icin geriye-donuk uyumlu isim; diger hatlar icin route'lu isim
-suffix = "" if ROUTE_ID == 502 else f"_route_{ROUTE_ID}"
+mode_suffix = "" if TARGET_MODE == "travel" else "_deviation"
+suffix = ("" if ROUTE_ID == 502 else f"_route_{ROUTE_ID}") + mode_suffix
 out_path = os.path.join(RESULTS_DIR, "tables", f"improved_ml_results{suffix}.csv")
 results_df.to_csv(out_path, index=False)
 print(f"\nSonuclar kaydedildi: {out_path}")

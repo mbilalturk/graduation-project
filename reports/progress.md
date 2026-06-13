@@ -31,7 +31,18 @@ Kod kalitesi + model dogrulugu icin adim adim, her adim ayri commit:
    prototip silindi. **Bu, ~20s MAE'nin polling kuantalama tabaninda oldugunun AMPIRIK
    kanitidir** → final rapor "Limitations": *daha ince etiket, public API'den daha yogun
    GPS gerektirir (GTFS-RT yok).*
-4. [ ] Hedefi sapmaya (deviation) cevirme
+4. **[~] Hedefi sapmaya cevirme — A/B yapildi, KAZANMADI (travel kaldi)**
+   `--target {travel,deviation}` eklendi (improved_ml.py + improved_lstm.py). A/B (route 502):
+   | Model | travel (mevcut) | deviation |
+   |---|---|---|
+   | XGBoost | MAE 0.4327 / R2 0.629 | 0.4821 / 0.515 |
+   | RF Improved | 0.4395 / 0.631 | 0.4868 / 0.522 |
+   | LSTM | 0.3573 / 0.349 | 0.3595 / 0.350 |
+   Agac modellerinde deviation **belirgin kotu** (MAE +%11), LSTM'de notr. **Sebep:**
+   (1) `scheduled_travel_min` ZATEN input feature → baz cizgi modelde mevcut, hedeften
+   cikarmak bilgi katmiyor; (2) travel'in log1p donusumu sag-carpik dagilimi stabilize
+   ediyor, deviation'in lineer olcegi bunu kaybediyor. `--target` knob'u kodda kaldi
+   (default=travel). Metodolojik tema (Adim 2 ile ayni): **"daha sofistike != daha iyi."**
 5. [ ] Cold-start tam cozumu
 6. [ ] LSTM hiperparametre sweep (Optuna)
 
