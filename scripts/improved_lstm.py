@@ -121,9 +121,10 @@ SEQUENCE_FEATURES = [
     "distance_m",
     "stop_progress",
 ]
+# Adim 2: hava feature'lari (temperature, humidity, precipitation, is_rainy)
+# context'ten cikarildi — agac modellerindeki ile ayni gerekce (yagissiz veride gurultu).
 CONTEXT_FEATURES = [
     "hour", "day_of_week", "is_weekend", "time_block_enc",
-    "temperature", "humidity", "precipitation", "is_rainy",
 ]
 
 # v3 ozellikleri: cumul_deviation ve rolling_3_deviation context'e aliniyor

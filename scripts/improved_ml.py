@@ -89,30 +89,37 @@ if "prev_speed_mpm" in df.columns and "distance_m" in df.columns:
 
 TARGET = "travel_time_min"
 
-# ── Ozellik listesi ───────────────────────────────────────────────────────────
-BASE_FEATURES = [
-    "hour", "day_of_week", "day_type", "time_block",
-    "hour_sin", "hour_cos", "dow_sin", "dow_cos",
-    "from_stop_seq", "to_stop_seq",
-    "distance_m", "stop_progress",
+# ── Ozellik listesi (Adim 2: ablation-destekli feature selection) ─────────────
+# 29 -> 16 feature. Cikarilanlar ve gerekceleri:
+#   (b) Fazlalik zaman kodlamasi: time_block, hour_sin/cos, dow_sin/cos, day_type
+#       — sin/cos sinir agi icindir; agac modelleri ham hour/day_of_week'i zaten boler.
+#   (c) Hava: temperature, humidity, precipitation, wind_speed, visibility,
+#       weather_cat_enc — ablation: yagissiz veride gurultu, MAE'yi kotulestiriyor.
+#   (c) Trafik: congestion_ratio — seyrek (cogu 1.0 dolgu), onem ~0.
+LEAN_FEATURES = [
+    # Zaman (ham — agac modelleri icin yeterli)
+    "hour", "day_of_week",
+    # Mekansal
+    "from_stop_seq", "to_stop_seq", "distance_m", "stop_progress",
+    # Lag / sapma
     "prev_travel_time_min", "prev_deviation",
-    "scheduled_travel_min",
-    "temperature", "humidity", "precipitation", "wind_speed",
-    "visibility", "weather_cat_enc", "congestion_ratio",
-]
-NEW_FEATURES = [
     "cumul_deviation", "rolling_3_deviation",
-    "stop_hist_median", "prev_speed_mpm", "stop_hist_ratio",
+    # Tarihsel (train'den)
+    "stop_hist_median", "stop_hist_ratio", "prev_speed_mpm",
+    # Dwell (v4, GPS turevli)
     "dwell_time_sec", "prev_dwell_time_sec",
+    # GTFS imza feature (ablation'da en kritik)
+    "scheduled_travel_min",
 ]
 
 available_features = [
-    f for f in BASE_FEATURES + NEW_FEATURES
+    f for f in LEAN_FEATURES
     if f in df.columns and df[f].notna().all()
 ]
-added_v3 = [f for f in NEW_FEATURES if f in available_features]
-print(f"\nToplam ozellik: {len(available_features)}")
-print(f"v3 yeni ozellikler: {added_v3 if added_v3 else 'YOK (v2 verisi kullaniliyor)'}")
+missing = [f for f in LEAN_FEATURES if f not in available_features]
+print(f"\nToplam ozellik (lean): {len(available_features)}/{len(LEAN_FEATURES)}")
+if missing:
+    print(f"  Eksik/NaN feature (atlandi): {missing}")
 
 X = df[available_features].values
 y = df[TARGET].values

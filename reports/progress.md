@@ -13,7 +13,13 @@ Kod kalitesi + model dogrulugu icin adim adim, her adim ayri commit:
    kaynagi). GTFS yuklenemezse acik `RuntimeError`. `collector.py`, `trip_extractor.py`,
    `build_features_route.py` ROUTES'a tasindi. Dogrulama: GTFS'ten 502 dir0=32/dir1=28
    (eski hardcoded ile birebir ayni) → veri kaybi yok.
-2. [ ] Feature selection + dedup (29→~12 feature, ablation destekli)
+2. **[x] Feature selection + dedup (TAMAMLANDI)** — ML feature seti 29→16 (%45 azalma):
+   fazlalik zaman kodlamasi (sin/cos, time_block, day_type) + 7 hava/trafik feature'i
+   cikarildi. LSTM context 15→11 (4 hava feature). Tekrar kolon `cumulative_deviation`
+   build_features_route.py'den kaldirildi. **A/B sonuc:** ML MAE her modelde iyilesti
+   (XGBoost 0.4388→0.4327, RF Improved 0.4591→0.4395, RF MoE 0.4402→0.4373);
+   LSTM MAE sabit (0.3601→0.3600), MAPE 39.66→39.21. Daha az feature, daha iyi/esit
+   MAE → "daha karmasik degil, daha temiz" kaniti.
 3. [ ] Etiket hassasiyeti (GPS interpolasyon ile varis zamani)
 4. [ ] Hedefi sapmaya (deviation) cevirme
 5. [ ] Cold-start tam cozumu

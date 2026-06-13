@@ -222,10 +222,9 @@ def add_lag_and_trip(df):
     df["trip_elapsed_min"] = df.groupby(g)["_cumsum_tt"].shift(1).fillna(0.0).round(3)
     df = df.drop(columns=["_cumsum_tt"])
 
-    df["_dev_curr"] = df["travel_time_min"] - df["scheduled_travel_min"]
-    df["_cumdev"]   = df.groupby(g)["_dev_curr"].cumsum()
-    df["cumulative_deviation"] = df.groupby(g)["_cumdev"].shift(1).fillna(0.0).round(3)
-    df = df.drop(columns=["_dev_curr", "_cumdev"])
+    # NOT (Adim 2 dedup): buradaki "cumulative_deviation" v3'teki "cumul_deviation"
+    # ile birebir ayniydi ve hicbir model tarafindan kullanilmiyordu — kaldirildi.
+    # Kumulatif sapma feature'i artik tek kaynaktan: add_v3() -> cumul_deviation.
 
     df["rolling_travel_avg3"] = (
         df.groupby(g)["travel_time_min"]
@@ -486,7 +485,7 @@ def main():
         "stop_progress", "distance_m",
         "prev_travel_time_min", "prev_deviation",
         "segments_into_trip", "is_trip_start", "trip_elapsed_min",
-        "cumulative_deviation", "rolling_travel_avg3",
+        "rolling_travel_avg3",
         "scheduled_travel_min",
         "temperature", "humidity", "precipitation", "wind_speed", "visibility",
         "weather_cat_enc", "is_rainy",
