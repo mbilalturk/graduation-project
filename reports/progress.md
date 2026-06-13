@@ -20,7 +20,17 @@ Kod kalitesi + model dogrulugu icin adim adim, her adim ayri commit:
    (XGBoost 0.4388→0.4327, RF Improved 0.4591→0.4395, RF MoE 0.4402→0.4373);
    LSTM MAE sabit (0.3601→0.3600), MAPE 39.66→39.21. Daha az feature, daha iyi/esit
    MAE → "daha karmasik degil, daha temiz" kaniti.
-3. [ ] Etiket hassasiyeti (GPS interpolasyon ile varis zamani)
+3. **[~] Etiket hassasiyeti — ARASTIRILDI, A/B kapisinda GERI ALINDI (limitation)**
+   GPS along-track interpolasyon prototiplendi (durak konumunu koprule yen iki ping'ten
+   gecis anini lineer interpolasyon). **Bulgu:** interpolasyon mumkun oldugunda etiketi
+   gercekten temizliyor (within-group std 0.91 -> 0.70), AMA **kapsama yalnizca ~%8**
+   (480/6316 segment, 3 gun ornek). Sebep fundamental: halka acik API'nin **30s polling'i**
+   sehir ici otobus hizinda (~165m/poll) cogu durak icin tek ping birakiyor; yogun-pingli
+   gecisler azinlik. %8 kapsama model MAE'sini anlamli iyilestiremez + dense-ping secimi
+   yavas/tikanik bolgelere onyargili (confound). Karar: pipeline'a entegre edilmedi,
+   prototip silindi. **Bu, ~20s MAE'nin polling kuantalama tabaninda oldugunun AMPIRIK
+   kanitidir** → final rapor "Limitations": *daha ince etiket, public API'den daha yogun
+   GPS gerektirir (GTFS-RT yok).*
 4. [ ] Hedefi sapmaya (deviation) cevirme
 5. [ ] Cold-start tam cozumu
 6. [ ] LSTM hiperparametre sweep (Optuna)
