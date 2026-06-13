@@ -1,8 +1,9 @@
 Karsilastirma,MAE Fark (dk),t-stat,p (t-test),p (Wilcoxon),Anlamli (p<0.05)
-XGBoost (Improved) vs Naive (GTFS),0.2105,82.4825,0.0,0.0,Evet
-XGBoost (Improved) vs Historical Avg,0.1421,68.7522,0.0,0.0,Evet
-XGBoost (Improved) vs Linear Reg,0.1779,74.2112,0.0,0.0,Evet
-XGBoost (Improved) vs Random Forest,0.1041,51.9239,0.0,0.0,Evet
-XGBoost (Improved) vs XGBoost,0.0981,52.3824,0.0,0.0,Evet
-XGBoost (Improved) vs Random Forest (Improved),0.0136,19.6841,0.0,0.0,Evet
-XGBoost (Improved) vs Enhanced XGB,0.1143,55.7156,0.0,0.0,Evet
+XGBoost (Improved) vs Naive (GTFS),0.2934,31.7546,0.0,0.0,Evet
+XGBoost (Improved) vs Historical Avg,0.2164,30.4094,0.0,0.0,Evet
+XGBoost (Improved) vs Linear Reg,0.2967,33.5386,0.0,0.0,Evet
+XGBoost (Improved) vs Random Forest,0.3631,42.2071,0.0,0.0,Evet
+XGBoost (Improved) vs XGBoost,0.3353,42.2145,0.0,0.0,Evet
+XGBoost (Improved) vs Random Forest (Improved),0.0088,4.3436,0.0,0.0,Evet
+XGBoost (Improved) vs Enhanced XGB,0.397,47.0064,0.0,0.0,Evet
+XGBoost (Improved) vs LSTM,0.0069,3.137,0.0017,0.0,Evet
