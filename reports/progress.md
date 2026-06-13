@@ -55,7 +55,33 @@ Kod kalitesi + model dogrulugu icin adim adim, her adim ayri commit:
    (3) **Cold-start gap ~1.5x ICSEL** — hicbir fill stratejisi kapatmiyor (raporun "2x"
    iddiasi temiz setupta 1.5x). LSTM'de strateji gurultu icinde (0.3590 vs 0.3565);
    tutarlilik icin none+is_trip_start uniform uygulandi. is_trip_start LSTM context'e (12).
-6. [ ] LSTM hiperparametre sweep (Optuna)
+6. **[x] Reproducibility + LSTM hiperparametre sweep (TAMAMLANDI)** —
+   `--seed` (torch+numpy) eklendi → LSTM artik tekrarlanabilir (onceden ±0.005 oynuyordu;
+   ayni seed iki kez tam 0.3586 verdi). HP'ler CLI arg: `--window/--units/--dropout/--lr`.
+   Grid (window×units) + 3-seed dogrulama:
+   | Config | MAE ort. (3 seed) | R2 ort. |
+   |---|---|---|
+   | w5/u128 (eski default) | 0.3588 | 0.344 |
+   | **w7/u128 (yeni default)** | **0.3585** | **0.3645** |
+   | w7/u64 | 0.3587 | 0.366 |
+   **Bulgu:** Hicbir config MAE'yi hareket ettirmedi → **Adim 3'un kuantalama tabani
+   bulgusunu dogruluyor** (mimari MAE tabanini asamaz). window=7 R2'yi tutarli +0.02
+   iyilestiriyor (daha fazla gecmis). w7/u128 adapte edildi (checkpoint-guvenli; units
+   degismedi). checkpoint artik rnn_units/dropout da kaydediyor (self-describing).
+
+---
+
+## ✅ Iyilestirme Programi TAMAMLANDI (6/6) — 2026-06-13
+
+6 adim, her biri ayri commit + A/B kapisi. Ozet:
+- **Kod kalitesi:** hardcoded durak blogu silindi (GTFS tek kaynak); 29→16 feature; tekrar
+  kolon temizlendi; LSTM reproducible (seed).
+- **3 negatif/notr A/B bulgusu** (metodolojik deger): deviation reframing, GPS interpolasyon,
+  HP tuning hicbiri MAE'yi iyilestirmedi → "kuantalama tabani" + "daha sofistike != daha iyi"
+  temalarini ampirik kanitladi.
+- **Kucuk gercek kazanclar:** feature selection (XGB 0.4388→0.4327), cold-start none+is_trip_start
+  (0.4327→0.4304), window=7 (R2 +0.02).
+- **En iyi model:** Improved LSTM MAE 0.3587, R2 0.3666 (route 502, temiz/reproducible).
 
 ---
 

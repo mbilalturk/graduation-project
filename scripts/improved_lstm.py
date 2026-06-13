@@ -43,11 +43,24 @@ _ap.add_argument("--coldstart", choices=["scheduled", "none", "hist"], default="
 _ap.add_argument("--no-tripstart-feat", dest="tripstart_feat", action="store_false",
                  help="is_trip_start'i context'e EKLEME (default: ekli)")
 _ap.set_defaults(tripstart_feat=True)
+# Adim 6: reproducibility + hiperparametre sweep
+_ap.add_argument("--seed", type=int, default=42, help="RNG seed (tekrarlanabilirlik)")
+_ap.add_argument("--window", type=int, default=7, help="Sliding window (Adim 6: 5->7, R2 +0.02)")
+_ap.add_argument("--units", type=int, default=128, help="LSTM gizli birim sayisi")
+_ap.add_argument("--dropout", type=float, default=0.2, help="Dropout orani")
+_ap.add_argument("--lr", type=float, default=0.001, help="Ogrenme orani")
 _args, _ = _ap.parse_known_args()
 ROUTE_ID = _args.route
 TARGET_MODE = _args.target
 COLDSTART = _args.coldstart
 TRIPSTART_FEAT = _args.tripstart_feat
+SEED = _args.seed
+
+# ── Reproducibility (Adim 6) ──────────────────────────────────────────────────
+import random
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
 
 # ── Yollar ────────────────────────────────────────────────────────────────────
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
@@ -62,14 +75,14 @@ os.makedirs(MODELS_DIR, exist_ok=True)
 os.makedirs(os.path.join(RESULTS_DIR, "tables"), exist_ok=True)
 os.makedirs(os.path.join(RESULTS_DIR, "figures"), exist_ok=True)
 
-# ── Hyperparametreler ─────────────────────────────────────────────────────────
-WINDOW_SIZE = 5       # 3 -> 5
-EPOCHS      = 50      # 30 -> 50
-BATCH_SIZE  = 64      # 16 -> 64
+# ── Hyperparametreler (Adim 6: CLI'dan ayarlanabilir, default = mevcut en iyi) ─
+WINDOW_SIZE = _args.window    # default 5
+EPOCHS      = 50
+BATCH_SIZE  = 64
 PATIENCE    = 15
-LR          = 0.001
-RNN_UNITS   = 128
-DROPOUT     = 0.2
+LR          = _args.lr        # default 0.001
+RNN_UNITS   = _args.units     # default 128
+DROPOUT     = _args.dropout   # default 0.2
 
 # ── Cihaz ─────────────────────────────────────────────────────────────────────
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -398,6 +411,8 @@ torch.save({
     "n_seq_feats"       : n_seq_feats,
     "n_ctx_feats"       : len(CONTEXT_FEATURES),
     "window_size"       : WINDOW_SIZE,
+    "rnn_units"         : RNN_UNITS,
+    "dropout"           : DROPOUT,
     "sequence_features" : SEQUENCE_FEATURES,
     "context_features"  : CONTEXT_FEATURES,
     "scaler_seq"        : scaler_seq,
