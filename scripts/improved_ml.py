@@ -40,9 +40,16 @@ _ap = argparse.ArgumentParser()
 _ap.add_argument("--route", type=int, default=502, help="route_id (502, 268, 565)")
 _ap.add_argument("--target", choices=["travel", "deviation"], default="travel",
                  help="Hedef: travel=log1p(travel_time), deviation=travel-scheduled")
+_ap.add_argument("--coldstart", choices=["scheduled", "none", "hist"], default="none",
+                 help="Trip-basi prev_travel_time_min=0 doldurma (default: none — Adim 5 kazanani)")
+_ap.add_argument("--no-tripstart-feat", dest="tripstart_feat", action="store_false",
+                 help="is_trip_start bayragini EKLEME (default: ekli)")
+_ap.set_defaults(tripstart_feat=True)
 _args, _ = _ap.parse_known_args()
 ROUTE_ID = _args.route
 TARGET_MODE = _args.target
+COLDSTART = _args.coldstart
+TRIPSTART_FEAT = _args.tripstart_feat
 
 # ── Yollar ────────────────────────────────────────────────────────────────────
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
@@ -79,16 +86,21 @@ print(f"Hedef (travel_time_min): min={df['travel_time_min'].min():.2f}  "
 # ── Kronolojik siralama ───────────────────────────────────────────────────────
 df = df.sort_values(["date", "trip_start_time", "from_stop_seq"]).reset_index(drop=True)
 
-# ── Cold-start düzeltmesi ─────────────────────────────────────────────────────
+# ── Cold-start stratejisi (Adim 5 A/B: scheduled | none | hist) ───────────────
 if "prev_travel_time_min" in df.columns:
-    df.loc[df["prev_travel_time_min"] == 0.0, "prev_travel_time_min"] = df["scheduled_travel_min"]
-    print("  prev_travel_time_min: 0.0 değerleri scheduled_travel_min ile dolduruldu (Cold-start)")
+    mask0 = df["prev_travel_time_min"] == 0.0
+    n0 = int(mask0.sum())
+    if COLDSTART == "scheduled":
+        df.loc[mask0, "prev_travel_time_min"] = df.loc[mask0, "scheduled_travel_min"]
+    elif COLDSTART == "hist" and "stop_hist_median" in df.columns:
+        df.loc[mask0, "prev_travel_time_min"] = df.loc[mask0, "stop_hist_median"]
+    # "none": trip-basi 0 olarak birakilir (model is_trip_start ile ayirt eder)
+    print(f"  Cold-start [{COLDSTART}]: {n0} trip-basi prev_travel_time_min islendi")
 
 if "prev_speed_mpm" in df.columns and "distance_m" in df.columns:
     df["prev_speed_mpm"] = (
         df["distance_m"] / df["prev_travel_time_min"].clip(lower=0.01)
     ).clip(upper=2000)
-    print("  prev_speed_mpm: düzeltilmiş prev_travel_time_min ile yeniden hesaplandı")
 
 TARGET = "travel_time_min"
 
@@ -123,6 +135,9 @@ missing = [f for f in LEAN_FEATURES if f not in available_features]
 print(f"\nToplam ozellik (lean): {len(available_features)}/{len(LEAN_FEATURES)}")
 if missing:
     print(f"  Eksik/NaN feature (atlandi): {missing}")
+if TRIPSTART_FEAT and "is_trip_start" in df.columns and df["is_trip_start"].notna().all():
+    available_features = available_features + ["is_trip_start"]
+    print(f"  + is_trip_start eklendi -> {len(available_features)} feature")
 
 X = df[available_features].values
 y = df[TARGET].values
@@ -245,6 +260,15 @@ if HAS_XGB:
     results.append(r_xgb)
     print(f"MAE={r_xgb['MAE (dk)']:.4f}  MAPE={r_xgb['MAPE (%)']:.2f}%  R2={r_xgb['R2']:.4f}")
 
+    # Cold-start kirilim: ilk %33 durak (stop_progress<0.33) vs kalan
+    sp_test = df["stop_progress"].values[split_idx:]
+    cs = sp_test < 0.33
+    if cs.sum() > 0 and (~cs).sum() > 0:
+        cs_mae   = mean_absolute_error(y_test[cs],  y_pred_xgb[cs])
+        rest_mae = mean_absolute_error(y_test[~cs], y_pred_xgb[~cs])
+        print(f"  Cold-start kirilim: ilk%33 MAE={cs_mae:.4f} (n={int(cs.sum())}) | "
+              f"kalan MAE={rest_mae:.4f} | oran={cs_mae/rest_mae:.2f}x")
+
 # ═══════════════════════════════════════════════════════════════════
 print(f"\n{'='*65}")
 print("4. SEGMENT BAZLI MODEL (Mixture of Experts)")
@@ -331,7 +355,9 @@ print(f"  R2   : {0.3325:.4f} -> {r_rf['R2']:.4f}  ({r_rf['R2'] - 0.3325:+.4f})"
 # ── Kaydet ───────────────────────────────────────────────────────────────────
 # Hat 502 icin geriye-donuk uyumlu isim; diger hatlar icin route'lu isim
 mode_suffix = "" if TARGET_MODE == "travel" else "_deviation"
-suffix = ("" if ROUTE_ID == 502 else f"_route_{ROUTE_ID}") + mode_suffix
+cs_tag = COLDSTART + ("-ts" if TRIPSTART_FEAT else "")
+cs_suffix = "" if cs_tag == "none-ts" else f"_cs-{cs_tag}"   # none-ts = Adim 5 default
+suffix = ("" if ROUTE_ID == 502 else f"_route_{ROUTE_ID}") + mode_suffix + cs_suffix
 out_path = os.path.join(RESULTS_DIR, "tables", f"improved_ml_results{suffix}.csv")
 results_df.to_csv(out_path, index=False)
 print(f"\nSonuclar kaydedildi: {out_path}")

@@ -43,7 +43,18 @@ Kod kalitesi + model dogrulugu icin adim adim, her adim ayri commit:
    cikarmak bilgi katmiyor; (2) travel'in log1p donusumu sag-carpik dagilimi stabilize
    ediyor, deviation'in lineer olcegi bunu kaybediyor. `--target` knob'u kodda kaldi
    (default=travel). Metodolojik tema (Adim 2 ile ayni): **"daha sofistike != daha iyi."**
-5. [ ] Cold-start tam cozumu
+5. **[x] Cold-start tam cozumu (TAMAMLANDI)** — 5 konfigurasyon A/B'si (improved_ml.py
+   `--coldstart {scheduled,none,hist}` + `--tripstart-feat`):
+   | Config | XGB MAE | R2 | cold-start MAE (ilk%33) |
+   |---|---|---|---|
+   | scheduled (eski) | 0.4327 | 0.629 | 0.5404 |
+   | none+is_trip_start (**yeni default**) | **0.4304** | **0.636** | **0.5359** |
+   **Bulgular:** (1) Hipotez CURUDU — scheduled-fill zarar vermiyor (none ile ~ayni);
+   0.39↔0.43 farki cold-start'tan degil. (2) `is_trip_start` bayragi kucuk ama tutarli
+   ML kazanci; sentetik doldurma yerine trip-basi sinyalini durustce gosteriyor.
+   (3) **Cold-start gap ~1.5x ICSEL** — hicbir fill stratejisi kapatmiyor (raporun "2x"
+   iddiasi temiz setupta 1.5x). LSTM'de strateji gurultu icinde (0.3590 vs 0.3565);
+   tutarlilik icin none+is_trip_start uniform uygulandi. is_trip_start LSTM context'e (12).
 6. [ ] LSTM hiperparametre sweep (Optuna)
 
 ---

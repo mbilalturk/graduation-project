@@ -38,9 +38,16 @@ _ap = argparse.ArgumentParser()
 _ap.add_argument("--route", type=int, default=502, help="route_id (502, 268, 565)")
 _ap.add_argument("--target", choices=["travel", "deviation"], default="travel",
                  help="Hedef: travel=log1p(travel), deviation=travel-scheduled")
+_ap.add_argument("--coldstart", choices=["scheduled", "none", "hist"], default="none",
+                 help="Trip-basi prev_travel_time_min=0 doldurma (default: none — Adim 5 kazanani)")
+_ap.add_argument("--no-tripstart-feat", dest="tripstart_feat", action="store_false",
+                 help="is_trip_start'i context'e EKLEME (default: ekli)")
+_ap.set_defaults(tripstart_feat=True)
 _args, _ = _ap.parse_known_args()
 ROUTE_ID = _args.route
 TARGET_MODE = _args.target
+COLDSTART = _args.coldstart
+TRIPSTART_FEAT = _args.tripstart_feat
 
 # ── Yollar ────────────────────────────────────────────────────────────────────
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
@@ -95,16 +102,21 @@ df["is_weekend"] = df["day_type"].astype(int)
 if "deviation_minutes" not in df.columns:
     df["deviation_minutes"] = df["travel_minutes"] - df["scheduled_travel_minutes"]
 
-# ── Cold-start düzeltmesi ─────────────────────────────────────────────────────
+# ── Cold-start stratejisi (Adim 5: scheduled | none | hist) ───────────────────
 if "prev_travel_time_min" in df.columns:
-    df.loc[df["prev_travel_time_min"] == 0.0, "prev_travel_time_min"] = df["scheduled_travel_minutes"]
-    print("  prev_travel_time_min: 0.0 değerleri scheduled_travel_minutes ile dolduruldu (Cold-start)")
+    mask0 = df["prev_travel_time_min"] == 0.0
+    n0 = int(mask0.sum())
+    if COLDSTART == "scheduled":
+        df.loc[mask0, "prev_travel_time_min"] = df.loc[mask0, "scheduled_travel_minutes"]
+    elif COLDSTART == "hist" and "stop_hist_median" in df.columns:
+        df.loc[mask0, "prev_travel_time_min"] = df.loc[mask0, "stop_hist_median"]
+    # "none": trip-basi 0 birakilir (is_trip_start context ile ayirt edilir)
+    print(f"  Cold-start [{COLDSTART}]: {n0} trip-basi prev_travel_time_min islendi")
 
 if "prev_speed_mpm" in df.columns and "distance_m" in df.columns:
     df["prev_speed_mpm"] = (
         df["distance_m"] / df["prev_travel_time_min"].clip(lower=0.01)
     ).clip(upper=2000)
-    print("  prev_speed_mpm: düzeltilmiş prev_travel_time_min ile yeniden hesaplandı")
 
 # Kategorik kodlama
 _w_map = {0: "clear", 1: "cloudy", 2: "rainy", 3: "snowy"}
@@ -138,6 +150,11 @@ for f in ["cumul_deviation", "rolling_3_deviation",
     if f in df.columns:
         CONTEXT_FEATURES.append(f)
         print(f"  + Context ozellik eklendi : {f}")
+
+# Adim 5: is_trip_start context'e (cold-start sinyali)
+if TRIPSTART_FEAT and "is_trip_start" in df.columns:
+    CONTEXT_FEATURES.append("is_trip_start")
+    print(f"  + Context ozellik eklendi : is_trip_start")
 
 TARGET = "travel_minutes"
 print(f"\nSequence ozellikler ({len(SEQUENCE_FEATURES)}): {SEQUENCE_FEATURES}")
@@ -367,7 +384,9 @@ if ROUTE_ID == 502:
                   "MAPE (%)": BASE_MAPE, "R2": BASE_R2})
 results_df = pd.DataFrame(_rows)
 mode_suffix = "" if TARGET_MODE == "travel" else "_deviation"
-suffix = ("" if ROUTE_ID == 502 else f"_route_{ROUTE_ID}") + mode_suffix
+cs_tag = COLDSTART + ("-ts" if TRIPSTART_FEAT else "")
+cs_suffix = "" if cs_tag == "none-ts" else f"_cs-{cs_tag}"   # none-ts = Adim 5 default
+suffix = ("" if ROUTE_ID == 502 else f"_route_{ROUTE_ID}") + mode_suffix + cs_suffix
 results_path = os.path.join(RESULTS_DIR, "tables", f"improved_lstm_results{suffix}.csv")
 results_df.to_csv(results_path, index=False)
 print(f"\nSonuclar kaydedildi: {results_path}")
