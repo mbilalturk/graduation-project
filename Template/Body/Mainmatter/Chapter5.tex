@@ -17,7 +17,7 @@ MAE is the primary metric, as it is robust and directly interpretable in minutes
 
 \section{Overall Model Comparison}
 
-Table~\ref{tab:overall} reports the performance of all models on the same route-502 test set. The two non-learned baselines are clearly outperformed by the learned models: the naïve schedule-based predictor and the historical average reach MAE values of $0.73$ and $0.65$~minutes respectively, whereas the improved learned models cluster around $0.43$~minutes. Among the learned models, XGBoost achieves the lowest MAE ($0.4327$), the dual-input LSTM achieves the best $R^2$ and RMSE, and the Random Forest is marginally behind both.
+Table~\ref{tab:overall} reports the performance of all models on the same route-502 test set. The two non-learned baselines are clearly outperformed by the learned models: the naïve schedule-based predictor and the historical average reach MAE values of $0.73$ and $0.65$~minutes respectively, whereas the improved learned models cluster around $0.43$~minutes. Among the learned models, XGBoost achieves the lowest MAE ($0.4327$), the dual-input LSTM achieves the best $R^2$ and RMSE, and the Random Forest is marginally behind both. Figure~\ref{fig:comprehensive} visualizes the overall comparison together with the error diagnostics.
 
 \begin{table}[!htbp]
     \centering
@@ -34,6 +34,12 @@ Table~\ref{tab:overall} reports the performance of all models on the same route-
         \bottomrule
     \end{tabular}
 \end{table}
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\textwidth]{comprehensive_evaluation.png}
+    \caption{\label{fig:comprehensive}Comprehensive evaluation of the models on route 502: overall error comparison together with error diagnostics.}
+\end{figure}
 
 A subtle but important point concerns the LSTM. Evaluated in isolation on its own sequence-level test set (which, by construction, excludes the harder cold-start segments), the LSTM reaches an MAE of about $0.35$~minutes. This figure is \emph{not} directly comparable with the tree models, because it is measured on an easier subset. When the LSTM is evaluated on exactly the same full segment-level test set as the other models, its MAE is $0.4345$~minutes, as shown in Table~\ref{tab:overall}. Reporting the same-test-set figure is essential for a fair comparison and is the basis for the statistical analysis below.
 
@@ -61,7 +67,7 @@ The tests yield a clear ordering, $\text{XGBoost} \approx \text{LSTM} > \text{RF
 
 \section{Condition-Based Analysis}
 
-Breaking the error down by operating condition (Table~\ref{tab:condition}) reveals where the difficulty lies and confirms that all three learned models behave consistently.
+Breaking the error down by operating condition (Table~\ref{tab:condition}, with the weather and time-of-day effects also shown in Figure~\ref{fig:weather}) reveals where the difficulty lies and confirms that all three learned models behave consistently.
 
 \begin{table}[!htbp]
     \centering
@@ -90,6 +96,12 @@ Breaking the error down by operating condition (Table~\ref{tab:condition}) revea
 \end{table}
 
 Three observations stand out. First, the morning peak is the hardest time of day and the night the easiest, as expected from congestion patterns. Second, although weather features were not useful to the models (Chapter~4), the small number of rainy segments that were captured exhibit a clearly higher error ($0.595$ versus about $0.43$ in dry conditions); this is consistent with rain making travel times harder to predict, but the sample is too small ($324$ segments) to train a reliable weather-aware model. Third, and most importantly, the first third of each route (the cold-start zone) has roughly $1.5\times$ the error of the middle and final thirds, confirming that the start of a trip is intrinsically harder because little recent history is available.
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\textwidth]{weather_time_impact.png}
+    \caption{\label{fig:weather}Impact of weather conditions and time of day on the prediction error.}
+\end{figure}
 
 \section{Generalization Across Routes}
 
