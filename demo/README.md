@@ -1,34 +1,33 @@
-# Demo — Otobüs Varış Süresi Tahmini
+# Demo — Bus Arrival Time Prediction
 
-Bitirme projesi demo videosu için hazırlanan materyaller.
+Materials for the graduation-project demo video. **Bilingual (English + Turkish).**
 
-## İçerik
-- **`index.html`** — Self-contained demo dashboard'u. **Çift tıkla, tarayıcıda açılır.**
-  Sunucu veya internet gerektirmez (tüm gerçek veri dosyaya gömülüdür).
-- **`konusma_metni.md`** — Video için Türkçe konuşma metni (sahne/ekran ipuçlarıyla, ~3.5–4 dk).
-- **`build_demo.py`** — Dashboard'u gerçek sonuç CSV'lerinden yeniden üreten script.
+## Contents
+| File | Description |
+|------|-------------|
+| **`index.html`** | Demo dashboard — **English** (default). Double-click → opens in browser. |
+| **`index_tr.html`** | Demo dashboard — **Turkish**. |
+| **`script_en.md`** | Speech script — **English** (~3.5–4 min, with screen cues). |
+| **`konusma_metni.md`** | Speech script — **Turkish**. |
+| **`build_demo.py`** | Generator that rebuilds both dashboards from the real result CSVs. |
 
-## Kullanım
+The dashboards are **self-contained**: no server and no internet required (all real
+data is embedded). Just double-click the HTML file. Full screen (F11) recommended for recording.
 
-### Demo'yu aç
-`demo/index.html` dosyasına çift tıkla (veya tarayıcıya sürükle). Video için tam ekran (F11) önerilir.
-
-### Yeni sonuçlarla güncelle
-Modelleri yeniden çalıştırdıysan dashboard'u tazele:
+## Rebuild after new results
 ```bash
-python demo/build_demo.py
+python demo/build_demo.py        # writes index.html (EN) + index_tr.html (TR)
 ```
-Script şu dosyalardan veri çeker:
-`results/tables/full_comparison_table.csv`, `condition_analysis.csv`,
-`multi_route_comparison.csv`, `data_summary.csv`, `paper_comparison.csv`,
-ve `collected_data/route_502_features_v4.csv` (interaktif tahmin için).
+Data sources: `results/tables/full_comparison_table.csv`, `condition_analysis.csv`,
+`multi_route_comparison.csv`, `data_summary.csv`, `paper_comparison.csv`, and
+`collected_data/route_502_features_v4.csv` (for the interactive prediction).
 
-## Dashboard bölümleri
-1. Veri kümesi özeti (81.575 segment, 73 gün)
-2. Model karşılaştırması (XGBoost ≈ LSTM > RF)
-3. **Canlı tahmin denemesi** (segment + zaman dilimi seç → tahmin)
-4. Koşul bazlı analiz (yön / zaman / hava / durak bölgesi)
-5. Genelleme (3 hat)
-6. Makale kıyası + metodolojik bulgular
+## Dashboard sections
+1. Dataset summary (81,575 segments, 73 days)
+2. Model comparison (XGBoost ≈ LSTM > RF)
+3. **Live prediction** (pick a segment + time of day → estimate)
+4. Condition-based analysis (direction / time / weather / stop zone)
+5. Generalization (3 routes)
+6. Reference comparison + methodological findings
 
-Tüm sayılar `results/` altındaki tekrarlanabilir (seed=42) çıktılardan gelir.
+All numbers come from the reproducible (seed=42) outputs under `results/`.
