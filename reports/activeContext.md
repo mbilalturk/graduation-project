@@ -33,9 +33,18 @@ A/B-gudumlu 6 adimli program (detay: progress.md §Iyilestirme Programi). Ozet:
   "daha sofistike != daha iyi" + kuantalama tabani bulgulari, 3-hat genelleme, veri kapsami sinirlari.
 - Kalan is: bu notlari nihai sunum dosyasina/konusmaci notlarina tasimak.
 
-### 3. Demo Sistemi (ORTA ONCELIK)
-- Eski `web_dashboard.py` 2026-06-05 refaktorunde silindi (modele hic baglanmamisti). Demo sifirdan kurulmali.
-- Teslimde canli gosterim bekleniyorsa entegrasyon zaman riski tasiyor.
+### 3. Demo Sistemi ✅ CANLI HARITA KURULDU (2026-06-18)
+- **`demo/harita.html`** — Moovit benzeri canli hat haritasi (Leaflet + CartoDB). 3 hat (502/268/565),
+  gercek durak/guzergah (GTFS). Yon degistirme butonu (gidis/donus).
+- **Gercek otobus konumlari** — Izmir ESHOT acik API'sinden canli (`hatotobuskonumlari/{hat}`, 30 sn;
+  harita 10 sn yumusatma). API her otobus icin coklu kayit (iz+bayat) doner → her otobus icin rotaya
+  EN YAKIN kayit secilir, rota disi (>500m) ve 0-0 elenir. (Acik API 268 icin az otobus donebiliyor —
+  kaynak siniri, kod hatasi degil.)
+- **Gercek model tahmini** — `demo/predict_server.py` (stdlib http.server, flask yok) per-hat LSTM
+  (`models/improved_lstm*.pt`) yukler; her hat/yon/saat icin tipik-trip segment surelerini modelle
+  hesaplayip kumulatif dakika-vs-rota-kesri izgarasi (`/api/grid`) sunar. Harita ETA = cum(durak)−cum(otobus).
+  Calistirma: `python demo/predict_server.py` → http://localhost:8000. file:// ile acilirsa model kapali,
+  ETA mesafe/hiz yedegine duser.
 
 ### 4. Veri Toplama ve Modelleme ✅ TAMAMLANDI
 - Collector 27 gun calisti; 138.282 segmentlik veriyle pipeline yeniden uretildi.
@@ -48,7 +57,7 @@ A/B-gudumlu 6 adimli program (detay: progress.md §Iyilestirme Programi). Ozet:
 | # | Bloklayici | Etki | Cozum |
 |---|-----------|------|-------|
 | 1 | **Yagisli/kis kosullari verisi yok** | Hava durumu feature etkisi guclu sekilde savunulamiyor | Yagisli donemde veri topla veya bunu acik sinirlilik olarak raporla |
-| 2 | **Demo sistemi yok** | Canli gosterim/planned deployment zayif kaliyor | Demo'yu sifirdan kur, `models/improved_lstm*.pt` ile entegre et (eski web_dashboard.py silindi) |
+| 2 | ✅ **Demo sistemi (COZULDU 2026-06-18)** | Canli harita kuruldu: gercek ESHOT konumlari + LSTM ETA | `demo/harita.html` + `demo/predict_server.py` (`models/improved_lstm*.pt`); `python demo/predict_server.py` → localhost:8000 |
 | 3 | **Sunum ve final rapor tam kapanmadi** | Teknik calisma teslim artefaktina donusmeyebilir | Sunum metni, rapor bolumleri ve sekil/tablo referanslarini tamamla |
 | 4 | ✅ **LSTM vs RF anlamlilik testi (COZULDU 2026-06-13)** | Adil test: XGBoost ≈ LSTM > RF (XGB vs LSTM p=0.38; ikisi de RF'den anlamli iyi). XGBoost en pratik. "LSTM en iyi" artefaktti | evaluation.ipynb → lstm_vs_ml_significance.csv |
 
