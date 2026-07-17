@@ -15,3 +15,6 @@ __pycache__/
 
 # Egitilmis modeller (notebook'lar yeniden uretir)
 models/
+
+Final_Report/
+bus-arrival-prediction-izmir-report.pdf
