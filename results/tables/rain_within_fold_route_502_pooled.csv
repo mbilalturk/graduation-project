@@ -1,0 +1,5 @@
+fold,n_rainy,n_clear,mae_rainy,mae_clear,diff
+route_502_test_predictions_cv28.csv,431,1919,0.4493,0.4701,-0.0209
+route_502_test_predictions_cv37.csv,253,2251,0.5526,0.4618,0.0908
+route_502_test_predictions_cv46.csv,318,675,0.5896,0.5276,0.062
+route_502_test_predictions_cv55.csv,66,2333,0.4799,0.4062,0.0737

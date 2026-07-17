@@ -49,12 +49,30 @@ _ap.add_argument("--window", type=int, default=7, help="Sliding window (Adim 6: 
 _ap.add_argument("--units", type=int, default=128, help="LSTM gizli birim sayisi")
 _ap.add_argument("--dropout", type=float, default=0.2, help="Dropout orani")
 _ap.add_argument("--lr", type=float, default=0.001, help="Ogrenme orani")
+# SCI ablation: LSTM icin c0/c1 kosulamaz — sequence girdisi dogasi geregi lag icerir.
+_ap.add_argument("--feature-set", choices=["c0", "c1", "c2", "c3", "c4", "full"],
+                 default="full", help="Additive ablation konfigurasyonu (LSTM: c2/c3/c4/full)")
+_ap.add_argument("--save-preds", action="store_true",
+                 help="Segment-level test setine hizalanmis tahminleri results/predictions/ altina yaz")
 _args, _ = _ap.parse_known_args()
 ROUTE_ID = _args.route
 TARGET_MODE = _args.target
 COLDSTART = _args.coldstart
 TRIPSTART_FEAT = _args.tripstart_feat
 SEED = _args.seed
+FEATURE_SET = _args.feature_set
+
+try:
+    from scripts.feature_sets import LSTM_ALLOWED
+except ImportError:
+    from feature_sets import LSTM_ALLOWED
+
+if FEATURE_SET not in LSTM_ALLOWED:
+    raise SystemExit(
+        f"HATA: LSTM icin feature-set '{FEATURE_SET}' kosulamaz.\n"
+        f"Sequence girdisi dogasi geregi lag (onceki segment sureleri) icerir; "
+        f"c0/c1 lag'i disladigi icin LSTM x c0/c1 hucresi izgarada N/A birakilir. "
+        f"Gecerli: {LSTM_ALLOWED}")
 
 # ── Reproducibility (Adim 6) ──────────────────────────────────────────────────
 import random
@@ -157,9 +175,20 @@ CONTEXT_FEATURES = [
 
 # v3 ozellikleri: cumul_deviation ve rolling_3_deviation context'e aliniyor
 # (sequence'a eklenirse window icinde matematiksel turetim mumkun olur — leakage riski)
-for f in ["cumul_deviation", "rolling_3_deviation",
-          "stop_hist_median", "prev_speed_mpm", "stop_hist_ratio",
-          "dwell_time_sec", "prev_dwell_time_sec"]:
+# Ablation: opsiyonel context feature'lar konfige gore kisitlanir.
+#   c2 = temel + deviation ailesi; c3 = c2 + tarihsel; c4/full = c3 + dwell.
+#   (Sequence kanallari — lag travel, scheduled, distance, progress — c2'den
+#    itibaren zaten konfig kapsaminda; kisit yalniz context koluna uygulanir.)
+_DEV_FAM  = ["cumul_deviation", "rolling_3_deviation"]
+_HIST_FAM = ["stop_hist_median", "prev_speed_mpm", "stop_hist_ratio"]
+_DWELL_FAM = ["dwell_time_sec", "prev_dwell_time_sec"]
+CFG_CONTEXT_EXTRA = {
+    "c2"  : _DEV_FAM,
+    "c3"  : _DEV_FAM + _HIST_FAM,
+    "c4"  : _DEV_FAM + _HIST_FAM + _DWELL_FAM,
+    "full": _DEV_FAM + _HIST_FAM + _DWELL_FAM,
+}
+for f in CFG_CONTEXT_EXTRA[FEATURE_SET]:
     if f in df.columns:
         CONTEXT_FEATURES.append(f)
         print(f"  + Context ozellik eklendi : {f}")
@@ -185,6 +214,7 @@ def create_sequences(df, window_size):
     böylece train/test split tarihsel olarak temiz kalır.
     """
     X_seq_list, X_ctx_list, y_list, sched_list, ts_list = [], [], [], [], []
+    idx_list = []   # orijinal df satir indeksi (save-preds hizalamasi icin)
     trip_groups = df.groupby(["bus_id", "yon", "trip_start_time"])
     skipped = 0
 
@@ -198,6 +228,7 @@ def create_sequences(df, window_size):
         target_vals = trip[TARGET].values.astype(np.float32)
         sched_vals  = trip["scheduled_travel_minutes"].values.astype(np.float32)
         timestamps  = trip["arrival_timestamp"].values
+        row_idx     = trip.index.values
 
         for i in range(window_size, len(trip)):
             X_seq_list.append(seq_vals[i - window_size:i])
@@ -205,21 +236,24 @@ def create_sequences(df, window_size):
             y_list.append(target_vals[i])
             sched_list.append(sched_vals[i])
             ts_list.append(timestamps[i])
+            idx_list.append(row_idx[i])
 
     print(f"  Trip atlandı (kisa): {skipped}")
     if not X_seq_list:
-        return np.array([]), np.array([]), np.array([]), np.array([])
+        return (np.array([]), np.array([]), np.array([]), np.array([]),
+                np.array([], dtype=np.int64))
 
     # Kronolojik sıralama — train/test split için kritik
     order = np.argsort(ts_list)
     return (np.array(X_seq_list, dtype=np.float32)[order],
             np.array(X_ctx_list, dtype=np.float32)[order],
             np.array(y_list,     dtype=np.float32)[order],
-            np.array(sched_list, dtype=np.float32)[order])
+            np.array(sched_list, dtype=np.float32)[order],
+            np.array(idx_list,   dtype=np.int64)[order])
 
 
 print(f"\nSequence olusturuluyor (window={WINDOW_SIZE})...")
-X_seq, X_ctx, y, y_sched = create_sequences(df, WINDOW_SIZE)
+X_seq, X_ctx, y, y_sched, row_ids = create_sequences(df, WINDOW_SIZE)
 print(f"X_seq: {X_seq.shape}  X_ctx: {X_ctx.shape}  y: {y.shape}")
 
 # ── Train / Test bolme (kronolojik) ───────────────────────────────────────────
@@ -399,7 +433,8 @@ results_df = pd.DataFrame(_rows)
 mode_suffix = "" if TARGET_MODE == "travel" else "_deviation"
 cs_tag = COLDSTART + ("-ts" if TRIPSTART_FEAT else "")
 cs_suffix = "" if cs_tag == "none-ts" else f"_cs-{cs_tag}"   # none-ts = Adim 5 default
-suffix = ("" if ROUTE_ID == 502 else f"_route_{ROUTE_ID}") + mode_suffix + cs_suffix
+fs_suffix = "" if FEATURE_SET == "full" else f"_fs-{FEATURE_SET}"
+suffix = ("" if ROUTE_ID == 502 else f"_route_{ROUTE_ID}") + mode_suffix + cs_suffix + fs_suffix
 results_path = os.path.join(RESULTS_DIR, "tables", f"improved_lstm_results{suffix}.csv")
 results_df.to_csv(results_path, index=False)
 print(f"\nSonuclar kaydedildi: {results_path}")
@@ -420,3 +455,62 @@ torch.save({
     "results"           : {"mae": mae, "rmse": rmse, "mape": mape, "r2": r2},
 }, model_path)
 print(f"Model kaydedildi  : {model_path}")
+
+# ── Segment-level test setine hizalanmis tahmin kaydi (SCI: model x feature izgarasi) ─
+# improved_ml.py'nin kronolojik %80/20 segment spliti birebir kopyalanir; LSTM'in
+# tahmin uretemedigi satirlar (trip'in ilk window_size segmenti, kisa tripler,
+# LSTM'in kendi train penceresine dusen sinir satirlari) pred_lstm=NaN kalir.
+# Izgara hucresi icin ayrica scheduled-fallback'li tam-test MAE raporlanir
+# (rapor §5.2 same-test-set ilkesi; fallback secimi acikca belgelenir).
+if _args.save_preds:
+    pred_map = pd.Series(y_pred, index=row_ids[split_idx:])
+
+    seg = df.sort_values(["date", "trip_start_time", "from_stop_seq"])
+    seg_split = int(len(seg) * 0.8)
+    seg_test  = seg.iloc[seg_split:]
+
+    META = ["date", "bus_id", "trip_start_time", "arrival_timestamp",
+            "hour", "day_of_week", "day_type", "yon",
+            "from_stop_seq", "to_stop_seq", "segments_into_trip", "is_trip_start",
+            "stop_progress", "distance_m", "weather_cat_enc", "precipitation"]
+    out = seg_test[[c for c in META if c in seg_test.columns]].copy()
+    out["scheduled_travel_min"] = seg_test["scheduled_travel_minutes"].values
+    out["y_true"]    = seg_test["travel_minutes"].values
+    out["pred_lstm"] = pred_map.reindex(seg_test.index).values
+
+    covered  = out["pred_lstm"].notna()
+    coverage = float(covered.mean())
+    err_cov  = (out.loc[covered, "y_true"] - out.loc[covered, "pred_lstm"]).abs()
+    mae_covered = float(err_cov.mean()) if covered.any() else float("nan")
+    pred_filled = out["pred_lstm"].fillna(out["scheduled_travel_min"])
+    mae_full_fb = float((out["y_true"] - pred_filled).abs().mean())
+
+    print(f"\nSegment-level hizalama: {len(out)} test satiri")
+    print(f"  Kapsanan (LSTM tahminli): {int(covered.sum())} ({coverage*100:.1f}%)  "
+          f"MAE_covered={mae_covered:.4f}")
+    print(f"  Tam test (scheduled fallback ile): MAE={mae_full_fb:.4f}")
+
+    pred_dir = os.path.join(RESULTS_DIR, "predictions")
+    os.makedirs(pred_dir, exist_ok=True)
+    pred_path = os.path.join(pred_dir, f"route_{ROUTE_ID}_test_predictions_lstm{fs_suffix}.csv")
+    out.to_csv(pred_path, index=False)
+    print(f"Tahminler kaydedildi: {pred_path}")
+
+    # Ablation ozet tablosuna satir ekle/guncelle
+    abl_path = os.path.join(RESULTS_DIR, "tables",
+                            f"ablation_additive_lstm_route_{ROUTE_ID}.csv")
+    row = {"config": FEATURE_SET, "model": "LSTM (dual-input)",
+           "MAE_seq_own": round(mae, 4),
+           "MAE_covered": round(mae_covered, 4),
+           "coverage": round(coverage, 4),
+           "MAE_full_fallback": round(mae_full_fb, 4),
+           "RMSE_seq_own": round(rmse, 4), "R2_seq_own": round(r2, 4)}
+    if os.path.exists(abl_path):
+        abl = pd.read_csv(abl_path)
+        abl = abl[abl["config"] != FEATURE_SET]
+        abl = pd.concat([abl, pd.DataFrame([row])], ignore_index=True)
+    else:
+        abl = pd.DataFrame([row])
+    abl = abl.sort_values("config")
+    abl.to_csv(abl_path, index=False)
+    print(f"Ablation satiri kaydedildi: {abl_path}")

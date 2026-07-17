@@ -1,0 +1,3 @@
+model,MAE (dk),RMSE (dk),MAPE (%),R2
+XGBoost Improved (log-transform),0.3089,0.4273,34.67,0.4605
+RF Improved (log-transform),0.314,0.4324,35.44,0.4477

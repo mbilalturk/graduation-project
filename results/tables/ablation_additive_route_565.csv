@@ -1,0 +1,11 @@
+config,n_features,features_added,model,MAE (dk),RMSE (dk),MAPE (%),R2
+c0,6,taban: temporal+spatial,XGBoost Improved (log-transform),0.3498,0.4644,39.69,0.363
+c0,6,taban: temporal+spatial,RF Improved (log-transform),0.35,0.4644,39.71,0.3628
+c1,7,+ scheduled_travel_min (GTFS),XGBoost Improved (log-transform),0.3499,0.4645,39.69,0.3626
+c1,7,+ scheduled_travel_min (GTFS),RF Improved (log-transform),0.3502,0.4649,39.72,0.3615
+c2,12,"+ deviation/lag (prev, cumul, rolling, is_trip_start)",XGBoost Improved (log-transform),0.3094,0.4269,34.77,0.4618
+c2,12,"+ deviation/lag (prev, cumul, rolling, is_trip_start)",RF Improved (log-transform),0.3144,0.4331,35.5,0.4458
+c3,15,"+ historical (stop_hist_median/ratio, prev_speed_mpm)",XGBoost Improved (log-transform),0.3089,0.4273,34.67,0.4605
+c3,15,"+ historical (stop_hist_median/ratio, prev_speed_mpm)",RF Improved (log-transform),0.314,0.4324,35.44,0.4477
+c4,17,"+ dwell (dwell_time_sec, prev_dwell_time_sec)",XGBoost Improved (log-transform),0.3036,0.4172,34.12,0.4858
+c4,17,"+ dwell (dwell_time_sec, prev_dwell_time_sec)",RF Improved (log-transform),0.3101,0.4226,35.08,0.4726

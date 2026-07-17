@@ -1,0 +1,5 @@
+,MAE (dk),MAE (dk),RMSE (dk),RMSE (dk),MAPE (%),MAPE (%),R2,R2
+,mean,std,mean,std,mean,std,mean,std
+model,,,,,,,,
+RF Improved (log-transform),0.445,0.0275,0.928,0.0881,41.19,2.2706,0.6092,0.0517
+XGBoost Improved (log-transform),0.4406,0.0277,0.9403,0.0875,40.85,2.6118,0.5987,0.0527

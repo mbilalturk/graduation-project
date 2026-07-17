@@ -6,6 +6,48 @@
 
 ---
 
+## 0. İlerleme TODO — SCI Makaleye Giden Yol
+
+> Her aşama bittiğinde kutusu işaretlenir. Detaylar: Faz A → §9, hoca soruları → §7.
+
+**Faz A — Yerel analiz katmanı** ✅ 10/10 (2026-07-17 tamamlandı)
+- [x] İstatistik altyapısı: effect size + gün-bazlı blok bootstrap CI (`stats_utils.py`, TDD)
+- [x] `improved_ml.py`: feature-set / save-preds / CV-split / core-only + leakage-safe historical (headline birebir korundu)
+- [x] Additive ablation C0–C4 × {XGB, RF} × 3 hat
+- [x] LSTM ablation C2–C4 + **model × feature-set ızgarası** (RQ merkez deneyi: ~9× oran)
+- [x] Rolling-origin 5-fold CV (XGB 0.4406 ± 0.0277)
+- [x] Significance tabloları: segment + gün-düzeyi p, Cohen's d, Cliff's δ, CI
+- [x] Hata kırılımları: saat, zaman bloğu, hafta sonu, segment uzunluğu, yön + figürler
+- [x] Yağmur analizi fold-içi kontrollü (+0.051 ± 0.050 dk; naif farkın çoğu confound)
+- [x] Trip-progress (cold-start) figürü — full + C0 + C1 katmanlı
+- [x] Trip-level aggregation (10 durak: 2.45 dk; göreli hata %35→%16.9)
+
+**Faz B — Hoca ile hizalama** ⬜ 0/3
+- [ ] Bu doküman + §9 sonuçları hocaya iletilir
+- [ ] §7 sorularına cevap alınır (özellikle: RQ kurgusu onayı, hedef dergi, yağmur kapsamı, LSTM çerçevelemesi)
+- [ ] Veri toplayıcının yeniden başlatılması kararı (collector 13 Haziran'dan beri kapalı)
+
+**Faz C — Tamamlayıcı deneyler** ⬜ 0/2 *(hoca cevabına göre kapsam netleşir)*
+- [ ] LSTM rolling-origin CV (5 gecelik koşum; opsiyonel robustluk eki)
+- [ ] (Veri toplama yeniden başlarsa) genişleyen veriyle koşumların tazelenmesi
+
+**Faz D — Literatür ve konumlandırma** ⬜ 0/3
+- [ ] Literatür taraması (SCI için 30–60 referans; şu an 5)
+- [ ] Kaya & Kalay künyesinin tamamlanması (yazar adları, cilt, sayfa)
+- [ ] Related work + novelty konumlandırması ("bağlam > model" tezinin literatürdeki yeri)
+
+**Faz E — Makale yazımı** ⬜ 0/4
+- [ ] IMRaD taslak yapısı + bölüm planı (ayrı plan dokümanı)
+- [ ] Figür/tablo son seçimi ve İngilizce cilalama
+- [ ] Metodoloji notlarının işlenmesi (§9.4: gün=bağımsızlık birimi, LSTM N/A hücreleri, yağmur fold-içi, trip-level iyimserlik notu)
+- [ ] İç inceleme + hocaya taslak teslimi
+
+**Faz F — Başvuru** ⬜ 0/2
+- [ ] Hedef dergi formatına geçirme (dergi kararı Faz B'de)
+- [ ] Cover letter + submission
+
+---
+
 ## 1. Yönetici Özeti
 
 Hocanın 7 tespitinin **5'i tamamen doğru** (ablation, trip-progress grafiği, effect size, güven aralığı, detaylı hata analizi), **1'i kısmen doğru** (cross-validation: time-based split zaten var ama hiç CV yok), **1'inde de hocanın bilmediği bir iyi haber var** (yağmur verisi artık mevcut — 11 yağışlı gün).
@@ -266,7 +308,70 @@ Toplam: ~2-3 hafta odaklı çalışma (koşumlar gecelik paralelde).
 
 ---
 
-## 9. Sonraki Adımlar
+## 9. Uygulama Durumu (2026-07-17 — yerel analiz katmanı tamamlandı)
+
+Plan: `docs/superpowers/plans/2026-07-17-sci-local-analysis.md` (12 task'ın tamamı koşuldu; tüm sonuçlar seed=42 ile reprodüsibl). Headline davranış korundu: argümansız `improved_ml.py --route 502` koşumu commit'li `improved_ml_results.csv` ile **bayt-aynı** sonuç veriyor (XGBoost MAE 0.4327).
+
+### 9.1. Üretilen analizler ve dosyalar
+
+| Hoca maddesi | Çıktı | Dosyalar |
+|---|---|---|
+| 1 — Ablation | Additive C0–C4 × {XGB, RF} × 3 hat + LSTM C2–C4 + **model×feature ızgarası** | `results/tables/ablation_additive_route_{502,268,565}.csv`, `ablation_additive_lstm_route_502.csv`, `ablation_grid_route_502.csv`, `ablation_grid_covered_route_502.csv` |
+| 2 — Trip-progress | MAE vs `segments_into_trip` figürü (full + C0 + C1, CI bantlı, cold-start gölgeli) | `results/figures/error_by_trip_progress.png`, `results/tables/error_by_trip_progress.csv` |
+| 3 — Effect size | Cohen's d + Cliff's δ, tüm model çiftleri | `results/tables/statistical_tests_v3.csv` |
+| 4 — CI | Gün-bazlı blok bootstrap (B=1000) MAE/RMSE %95 CI | `results/tables/metric_confidence_intervals.csv` |
+| 5 — CV | Rolling-origin 5-fold (28/37/46/55/64 gün train, 9'ar gün test) | `results/tables/cv_rolling_origin_route_502.csv` + `_summary` |
+| 8 — Saat bazlı | Saatlik MAE eğrisi + zaman blokları, CI'li | `results/figures/error_by_hour*.png`, `results/tables/error_slices_route_502*.csv` |
+| 9 — Kırılımlar | Segment uzunluğu, hafta sonu, yağmur (fold-içi kontrollü), yön | aynı slices tabloları + `rain_within_fold_route_502_pooled.csv`, `error_by_segment_length*.png`, `error_by_weather*.png` |
+| (öneri) Trip-level | Kümülatif varış MAE'si vs horizon | `results/tables/trip_level_mae_route_502.csv`, `results/figures/trip_level_error_vs_horizon.png` |
+
+Altyapı: `scripts/stats_utils.py` (TDD, 6 test), `scripts/feature_sets.py` (tek doğruluk kaynağı), `scripts/run_ablation.py`, `scripts/run_cv.py`, `scripts/analysis_{significance,error_slices,trip_progress,trip_level}.py`, `scripts/build_ablation_grid.py`; `improved_ml.py`'a `--feature-set/--save-preds/--train-end-day/--test-days/--core-only` + leakage-safe historical yeniden hesaplama; `improved_lstm.py`'a `--feature-set/--save-preds` + segment-level hizalama.
+
+### 9.2. Headline sayılar
+
+**Model × feature-set ızgarası (RQ merkez deneyi, 502, MAE dk):**
+
+| | C0 | C1 | C2 | C3 | C4 |
+|---|---|---|---|---|---|
+| XGBoost | 0.5604 | 0.5605 | 0.4924 | 0.4930 | 0.4310 |
+| Random Forest | 0.5670 | 0.5670 | 0.4913 | 0.4905 | 0.4388 |
+| LSTM (kapsanan alt küme) | N/A* | N/A* | 0.3828 | 0.3660 | 0.3532 |
+
+\* Mimari gereği: sequence girdisi doğası gereği lag içerir; makalede tek cümleyle açıklanacak.
+
+- **RQ kanıtı:** Feature ekseni (XGB C0→C4) MAE'yi **0.129 dk** oynatıyor; model ekseni (aynı satırlarda XGB vs LSTM, `ablation_grid_covered`) en fazla **0.015 dk** — **~9×** fark. C4'te XGB 0.3533 vs LSTM 0.3532 (fiilen özdeş).
+- **Ablation deseni 3 hatta tutarlı:** C1≈C0, C2'de büyük düşüş, C4'te (dwell) belirgin düşüş (502: 0.492→0.431; 268: 0.383→0.371; 565: 0.309→0.304).
+- **CV:** XGBoost 5-fold MAE **0.4406 ± 0.0277** (RF 0.4450 ± 0.0275) — headline 0.4327 bandın içinde; sonuçlar tek test penceresine özgü değil.
+- **Effect size:** XGB vs RF: p_t=0.0008 ("anlamlı") ama d=−0.026, δ=−0.011 (**ihmal edilebilir**) → "istatistiksel anlamlılık ≠ pratik fark" anlatısının kanıtı. XGB vs Naive: δ=−0.34 (orta-büyük). Gün-düzeyi p'ler (n_days=23) segment-düzeyinden büyük, sıralama aynı.
+- **CI:** XGB MAE 0.4327 [0.4105, 0.4548]; ilk üç modelin CI'ları örtüşüyor (eşdeğerlik görsel olarak da savunulabilir).
+- **Yağmur (fold-içi kontrollü):** Naif tek-split farkı +0.151 dk iken fold-içi rainy−clear farkı **+0.051 ± 0.050 dk** (4 fold'un 1'inde negatif) → tek-split farkının büyük kısmı erken-fold/az-train confound'u. Makalede "küçük, geniş CI'lı gözlem" tonunda verilecek.
+- **Trip-level:** 10 durak ilerisi kümülatif varış MAE **2.45 dk** (naive 4.82; kansellasyonsuz üst sınır 5.45). Göreli hata horizon'la düşüyor: %35 (1 durak) → **%16.9** (10 durak) → MAPE %41 eleştirisine trip ölçeğinde cevap. Kaya & Kalay'ın 2.97 dk'sıyla aynı ölçekte kıyaslanabilir sayı.
+
+### 9.3. Beklentiyle çelişen dürüst bulgular (makalede cause-effect malzemesi)
+
+1. **Statik GTFS tek başına katkısız (C1≈C0, üç hatta da).** Ağaç modelleri segment kimliğini (`from/to_stop_seq`) zaten ezberliyor; tarife bilgisi segment kimliğinin fonksiyonu olduğu için marjinal bilgi eklemiyor. GTFS'in gerçek değeri **deviation feature'ları üzerinden** (tarifeye göre sapma = gerçek zamanlı bağlam) geliyor — C2 sıçraması bunun kanıtı. "GTFS önemli" iddiası makalede bu şekilde inceltilmeli.
+2. **Trip-progress figüründe C1 eğrisi C0'la üst üste** — "schedule cold-start'ı telafi eder" hipotezi doğrulanmadı. Cold-start'ta hatayı düşüren şey full modelin dwell + diğer bağlam feature'ları (pos 0'da C0/C1 1.01 vs full 0.55).
+3. **Yağmur etkisinin büyük kısmı confound çıktı** (bkz. 9.2) — fold-içi kontrol olmasaydı makaleye abartılı bir bulgu girecekti.
+4. **Trip gözlemi çok parçalı:** test setindeki 3.324 trip'in 2.354'ü tek segmentlik (GPS-durak eşleşmesi seyrek). Trip-level analiz "baştan eksiksiz gözlenen" triplerle yapıldı (0 trip atıldı ama k≥3 horizon'a yalnız ~950 trip ulaşıyor) ve bu alt küme genelden daha uzun/yavaş segmentler içeriyor (seçim etkisi tabloda `linear_ref` ile dürüstçe normalize edildi).
+5. **LSTM kapsaması %42.6:** window=7 nedeniyle LSTM, segment test setinin ancak yarısından azına tahmin üretebiliyor; scheduled-fallback'li tam-test MAE (0.65) model kıyası için anlamsız — bu yüzden model ekseni kıyası **kapsanan ortak alt kümede** yapıldı (`ablation_grid_covered_route_502.csv`).
+
+### 9.4. Makale yazımına taşınacak notlar
+
+- Izgarada LSTM×C0/C1 hücreleri "N/A — sequence input inherently contains lag information" dipnotuyla verilecek.
+- İstatistik metodolojisi tek ilkeyle anlatılacak: **gün = bağımsızlık birimi** (gün-bazlı blok bootstrap CI + gün-düzeyi kümelenmiş testler; segment-düzeyi p'ler ek olarak raporlanır, iyimserlik uyarısıyla).
+- Yağmur bulgusu yalnız fold-içi kontrollü haliyle sunulacak.
+- Trip-level sayı sunulurken "one-step-ahead tahminlerin toplamı = çoklu-adım tahminin iyimser kestirimi" notu düşülecek (aynı koşul naive için de geçerli, kıyas iç tutarlı).
+- LSTM eğitim scriptindeki trip gruplaması `(bus_id, yon, trip_start_time)` — date içermiyor; ~%1,4 trip çakışması var (bilinen küçük kusur, tüm konfigleri eşit etkilediği için ızgara kıyası geçerli; ileride düzeltilebilir).
+
+### 9.5. Kalan işler
+
+- **LSTM rolling-origin CV** (5 gecelik koşum) — opsiyonel robustluk eki; `improved_lstm.py`'a `--train-end-day` eklenerek koşulur.
+- **Literatür taraması + bibliyografya** (30–60 referans; Kaya & Kalay girdisinin tamamlanması) — teslim öncesine ertelendi, ayrı planlanacak.
+- **Hoca soruları (§7)** — özellikle RQ kurgusu onayı ve veri toplamanın yeniden başlatılması kararı.
+
+---
+
+## 10. Sonraki Adımlar
 
 1. Bu doküman hocaya iletilir; §7'deki sorulara cevap alınır (özellikle 1, 2, 3).
 2. Cevaplar beklenirken sıra 1–4 (effect size, CI, saatlik eğri, kırılımlar) başlatılabilir — hangi RQ kurgusu seçilirse seçilsin hepsi gerekli.

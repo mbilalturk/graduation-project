@@ -1,0 +1,4 @@
+config,model,MAE_seq_own,MAE_covered,coverage,MAE_full_fallback,RMSE_seq_own,R2_seq_own
+c2,LSTM (dual-input),0.3828,0.3828,0.4263,0.6636,0.6229,0.1554
+c3,LSTM (dual-input),0.366,0.366,0.4263,0.6565,0.592,0.237
+c4,LSTM (dual-input),0.3532,0.3532,0.4263,0.651,0.5407,0.3635

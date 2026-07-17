@@ -1,0 +1,4 @@
+config,n_covered,coverage_pct,mae_xgb_covered,mae_lstm_covered,diff_lstm_minus_xgb
+c2,6955,42.6,0.3681,0.3828,0.0147
+c3,6955,42.6,0.3666,0.366,-0.0006
+c4,6955,42.6,0.3533,0.3532,-0.0001

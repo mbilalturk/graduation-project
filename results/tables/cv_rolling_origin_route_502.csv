@@ -1,0 +1,11 @@
+fold,train_days,test_days,model,MAE (dk),RMSE (dk),MAPE (%),R2
+1,28,9,XGBoost Improved (log-transform),0.4455,1.0492,39.5,0.5316
+1,28,9,RF Improved (log-transform),0.4488,1.0467,39.95,0.5337
+2,37,9,XGBoost Improved (log-transform),0.4829,0.9995,44.59,0.5535
+2,37,9,RF Improved (log-transform),0.4847,0.9677,44.54,0.5814
+3,46,9,XGBoost Improved (log-transform),0.4348,0.8758,41.42,0.64
+3,46,9,RF Improved (log-transform),0.4417,0.8625,41.83,0.6508
+4,55,9,XGBoost Improved (log-transform),0.4064,0.8348,41.21,0.6473
+4,55,9,RF Improved (log-transform),0.4073,0.8233,41.17,0.657
+5,64,9,XGBoost Improved (log-transform),0.4335,0.9421,37.53,0.621
+5,64,9,RF Improved (log-transform),0.4425,0.9397,38.46,0.6229
